@@ -1,0 +1,1 @@
+make function that saves safe file on exit, or termination signal

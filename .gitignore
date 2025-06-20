@@ -1,10 +1,7 @@
 # Build items
 *.o
 *.a
-*.exe
-peanut-sdl*
-peanut-debug
-peanut-minifb
+peanut135
 tags
 build*/
 bin*/
@@ -20,3 +17,6 @@ bin*/
 *.gb
 *.gbc
 *.bin
+
+#links
+oe-*
