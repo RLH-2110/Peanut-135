@@ -44,7 +44,7 @@ uint8_t gb_rom_read(struct gb_s *gb, const uint_fast32_t addr)
  */
 int unmap_rom(){
   if (romData != NULL){
-    return munmap(romData,romSize); romData == NULL; romSize = 0;
+    return munmap(romData,romSize); romData = NULL; romSize = 0;
   }
 }
 

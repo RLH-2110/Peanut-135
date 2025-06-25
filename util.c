@@ -17,7 +17,7 @@ bool choice(const char * const formatStr, ...){
   va_start (args, formatStr);
 
   if (formatStr != NULL)
-    printf(formatStr,args);
+    vprintf(formatStr,args);
 
   va_end(args);
 

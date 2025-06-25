@@ -5,6 +5,8 @@
 
 #define BYTES_TO_MEGABYTES(bytes) (bytes / (1024 * 1024))
 
+#include <stdbool.h>
+#include <stdarg.h>
 
 /* calls pritnf with the given parameters, and then gives the user the choice of yes or no.
   parameters: same as printf

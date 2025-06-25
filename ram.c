@@ -69,13 +69,15 @@ bool initalize_cart_ram(struct gb_s *gameboy, const char *const romName){
 
   char *homeDir = getenv("HOME");
   if (homeDir == NULL){
-    puts("Error: $HOME is not set!");
-    return false;
+    puts("Error: $HOME is not set! Savefiles can not be read!");
+    goto file_does_not_exit;
   }
 
+  
   if (SAVE_FILE_USABLE_LENGH <= 3){
     printf("please increase the size of SAVE_FILE_MAX_LENGTH in RAM.H!\n\t Curent useable size: %ld\n",SAVE_FILE_USABLE_LENGH);  
-    return false;
+    puts("save file can not be read!");
+    goto file_does_not_exit;
   }
 
   char saveFileName[SAVE_FILE_MAX_LENGTH]; 
@@ -88,6 +90,7 @@ bool initalize_cart_ram(struct gb_s *gameboy, const char *const romName){
   strcpy(saveFileName+strlen(homeDir)                                       ,SAVE_LOCATION_FROM_HOME);          /* copy save folder path relative from home */
   memcpy(saveFileName+strlen(SAVE_LOCATION_FROM_HOME) ,romName              ,copyLength);                       /* copy file name */
   memcpy(saveFileName+copyLength                      ,SAVE_FILE_EXTENSION  ,strlen(SAVE_FILE_EXTENSION) + 1);  /* add SAVE_FILE_EXTENSION and \0 */
+
 
   bool fileExists;
   size_t saveFileSize = 0;
@@ -177,8 +180,9 @@ bool initalize_cart_ram(struct gb_s *gameboy, const char *const romName){
     return true;
   } 
 
+file_does_not_exit:
   /* file does not exist or we got an error while opening it */
-
+  
   cartRamData = calloc(cartRamSize,sizeof(uint8_t));
   if (cartRamData == NULL){
     puts("ERROR: Not enough memory for the cartrige RAM!");

@@ -1,12 +1,14 @@
 TARGET = peanut135
 OBJDIR = obj/
 CFLAGS += -Werror
+CFLAGS += $(shell pkg-config --cflags libdrm)
+LIBDRM += $(shell pkg-config --libs libdrm)
 
 all: $(TARGET)
 
 
-$(TARGET): $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJDIR)util.o
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+$(TARGET): $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJDIR)util.o $(OBJDIR)lcd.o  $(OBJDIR)drm.o
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LIBDRM)
 	$(info    #############################################################################)
 	$(info    $(CC))
 	$(info    -----------------------------------------------------------------------------)
@@ -17,11 +19,17 @@ $(TARGET): $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJDIR)util.o
 	$(info    -o $@) 
 	$(info    -----------------------------------------------------------------------------)
 	$(info    $(LDFLAGS))
+	$(info    -----------------------------------------------------------------------------)
+	$(info    $(LIBDRM))
 	$(info    #############################################################################)
 	
+$(OBJDIR)drm.o: drm.c
+	mkdir -p $(OBJDIR)
+	$(CC) $(CFLAGS) -c $^ -o $@ $(LDFLAGS) $(LIBDRM) 
+
 $(OBJDIR)%.o: %.c
 	mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) -c $^ -o $@ $(LDFLAGS) -Werror 
+	$(CC) $(CFLAGS) -c $^ -o $@ $(LDFLAGS)
 
 clean:
 	rm -f $(TARGET)
