@@ -14,25 +14,48 @@ typedef struct touch_info{
 } touch_info_t;
 
 
-#define SUPPORTED_FINGERS 10
+#define SUPPORTED_FINGERS 3 /* values above 3 can lead to weird behavior when fingers get too close! */
 touch_info_t fingers[SUPPORTED_FINGERS] = {0};
 int activeFingers = 0;
 int activeFingerId = -1;
 int activeFingerArrId = -1;
 int activeFingerOsSlot;
+int lastX;
+int lastY;
 
-/* gets current os slot */
-void get_inital_os_slot(void){
-  struct input_absinfo slot_info;
+/* gets current os slot, and x,y */
+void get_inital_finger_data(void){
+  struct input_absinfo absInfo;
 
   /* Get current slot */
-  if (ioctl(touchFd, EVIOCGABS(ABS_MT_SLOT), &slot_info) == 0) {
-    activeFingerOsSlot = slot_info.value;
+  if (ioctl(touchFd, EVIOCGABS(ABS_MT_SLOT), &absInfo) == 0) {
+    activeFingerOsSlot = absInfo.value;
     printf("Initial OS slot: %d\n", activeFingerOsSlot);
   } else {
     perror("Error: Could not get initial OS slot");
     activeFingerOsSlot = 0; /* Default to slot 0 */
   }
+
+  /* Get current x */
+  if (ioctl(touchFd, EVIOCGABS(ABS_X), &absInfo) == 0) {
+    lastX = absInfo.value;
+    printf("Initial X: %d\n", lastX);
+  } else {
+    perror("Error: Could not get initial X");
+    lastX = 0; /* fallback */
+  }
+
+
+  /* Get current y */
+  if (ioctl(touchFd, EVIOCGABS(ABS_Y), &absInfo) == 0) {
+    lastY = absInfo.value;
+    printf("Initial Y: %d\n", lastY);
+  } else {
+    perror("Error: Could not get initial Y");
+    lastY = 0; /* fallback */
+  }
+
+
 }
 
 /* returns the id for the fingers array via the fingerId, or -1 on error */
@@ -73,7 +96,7 @@ bool init_finger(int fingerId, int osSlot){
 
   if (slot == -1){ /* no free slot */
     if (activeFingers >= SUPPORTED_FINGERS){
-      printf("More Fingers than Supported! Max fingers: %d",SUPPORTED_FINGERS);
+      printf("More Fingers than Supported! Max fingers: %d\n",SUPPORTED_FINGERS);
       return false;
     }
     slot = activeFingers;
@@ -86,11 +109,11 @@ bool init_finger(int fingerId, int osSlot){
   finger->slot_used = true;
   finger->osSlot = osSlot;
   finger->fingerId = fingerId;
-  finger->x = -1;
-  finger->y = -1;
+  finger->x = lastX;
+  finger->y = lastY;
   finger->released = false;
-  finger->region = touchr_invalid;
-  finger->region_previous = touchr_invalid;
+  finger->region = get_touch_region(lastX, lastY);
+  finger->region_previous = finger->region;
 
   activeFingerId = fingerId;
   activeFingerArrId = slot;
@@ -158,14 +181,6 @@ void update_finger(touch_info_t *finger, uint_fast16_t x, uint_fast16_t y){
 
   if (y != -1)
     finger->y = y;
-
-  if (finger->x == -1 || finger->y == -1) /* needs more init*/
-    return;
-
-  if (finger->region == touchr_invalid){ /* init region */
-    finger->region = get_touch_region(finger->x, finger->y);
-    finger->region_previous = finger->region;
-  }
 
   finger->region = get_touch_region(finger->x, finger->y);
 }

@@ -28,7 +28,7 @@ $(OBJDIR)drm.o: drm.c
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) $(LIBDRM) 
 
-$(OBJDIR)main.o: main.c westonkill.c
+$(OBJDIR)main.o: main.c westonkill.c peanut_gb.h
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
 

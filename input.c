@@ -14,7 +14,7 @@
 #include "main.h"
 #include "button_map.h"
 
-#define DEBUG_INPUTS 1
+#define DEBUG_INPUTS 0
 
 #include "touch_regions.c" /* for debug stuff needs to be after the define */
 
@@ -153,7 +153,7 @@ void *touch_thread(void* data){
   struct pollfd pollStruct = {touchFd, POLLIN, 0}; 
   struct input_event ev;
 
-  get_inital_os_slot();
+  get_inital_finger_data();
   activeFingerArrId = -1;
   activeFingerId = -1;
 
@@ -244,9 +244,6 @@ void *touch_thread(void* data){
           if (finger->slot_used == false)
             continue;
 
-          if (finger->x == -1 || finger->y == -1 || finger->region_previous == touchr_invalid) /* still needs to init */
-            continue;
-
           int mask = get_button_from_touch(finger->x, finger->y); /* register current finger button and update finger if released */
 
 
@@ -265,9 +262,17 @@ void *touch_thread(void* data){
 
         } /* end of loop for every finger */
 
+#if DEBUG_INPUTS == 3
+        printf("activeFingers before clean: %d\n",activeFingers);
+#endif
+
         /* clean up the activeFingers count */
         while (activeFingers - 1 >= 0 && fingers[activeFingers - 1].slot_used == false)
           activeFingers--;
+
+#if DEBUG_INPUTS == 3
+        printf("activeFingers after clean:  %d\n",activeFingers);
+#endif
 
         /* set the inputs */
 
