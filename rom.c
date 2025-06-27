@@ -12,7 +12,7 @@
 #include "rom.h"
 #include "peanut.h"
 #include "util.h"
-
+#include "main.h"
 
 
 /*Returns a byte from the ROM file at the given address
@@ -110,6 +110,7 @@ bool load_rom_file(const char * const path){
       printf("error while trying open %s\n",path);
     return false;
   }
+  LOGR("ALLOC: ROMFILE",1);
 
   romData = mmap(NULL, statStruct.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
   
@@ -132,11 +133,13 @@ bool load_rom_file(const char * const path){
     return false;
   }
 
+  LOGR("ALLOC: ROMDATA",1);
 
   if (close(fd) != 0){
     perror("Error: close error after mmaping memory! close errno");
     /* does not return on error here, since mmap was still successfull */
-  }
+  }else
+    LOGR("CLEAN: ROMFILE",-1);
 
   return true;
 }

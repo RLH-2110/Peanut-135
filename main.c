@@ -6,6 +6,8 @@
 #include <stdbool.h>
 #include <signal.h>
 #include <libgen.h>
+#include <fcntl.h>
+#include <linux/input.h>
 
 /* peanut */
 #define PEANUT_GB_IS_LITTLE_ENDIAN 1
@@ -18,6 +20,8 @@
 #include "ram.h"
 #include "lcd.h"
 #include "drm.h"
+#include "input.h"
+#include "main.h"
 
 #include "westonkill.c"
 
@@ -30,6 +34,9 @@ size_t romSize;
 uint8_t *cartRamData;
 size_t cartRamSize;
 
+   /* from main.h */
+int resource_count = 0;
+
 /* note: there is a thread safe varaible `stop` in drm.h thats global. if set to 1, the program will eventually terminate */
 
 /* renames */
@@ -41,8 +48,10 @@ void gb_error(struct gb_s *gameboy, const enum gb_error_e gbError, const uint16_
 
 /* signal handler */
 void on_termination(int signal){
+  LOGR("RESOURCE LOG: GOT TERMINATION SIGNAL!",0);
   stop = 1;
 }
+
 
 int main(int argc, char **argv){
   if (argc != 2) {
@@ -50,8 +59,10 @@ int main(int argc, char **argv){
     return EXIT_FAILURE;
   }
   
-  struct gb_s gameboy;
+  if (init_input() == false)
+    return EXIT_FAILURE;
 
+  struct gb_s gameboy;
 
   signal(SIGINT,on_termination);
   signal(SIGTERM,on_termination);
@@ -106,14 +117,16 @@ int main(int argc, char **argv){
 
   while(!stop){
     gb_run_frame(&gameboy);
-    display_frame();
-  }
+    display_frame(); 
+
+    /* handle input */
+    gameboy.direct.joypad = get_input();    
+ }
 
 
 exit_cleanup:
   cleanup_drm();
 exit_early:
-  restart_weston();
   cleanup_and_exit(EXIT_SUCCESS);
 }
 
@@ -125,12 +138,19 @@ void cleanup_and_exit(int exitCode){
       perror("Error: Failed to unmap rom! errno");
     romData = NULL;
     romSize = 0;
+    LOGR("CLEAN: ROMDATA",-1);
   }
 
   if (cartRamData != NULL){
     free(cartRamData); cartRamData = NULL;
+    LOGR("CLEAN: RAMDATA",-1);
   }
 
+  cleanup_input();
+ 
+  restart_weston();
+
+  LOGR("PROGRAM TERMINATION...",0);
   exit(exitCode);
 }
 

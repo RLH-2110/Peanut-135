@@ -7,7 +7,8 @@ LIBDRM += $(shell pkg-config --libs libdrm)
 all: $(TARGET)
 
 
-$(TARGET): $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJDIR)util.o $(OBJDIR)lcd.o  $(OBJDIR)drm.o
+$(TARGET): $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJDIR)util.o $(OBJDIR)lcd.o  $(OBJDIR)drm.o $(OBJDIR)input.o
+
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LIBDRM)
 	$(info    #############################################################################)
 	$(info    $(CC))
@@ -25,7 +26,15 @@ $(TARGET): $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJDIR)util.o $(OBJDI
 	
 $(OBJDIR)drm.o: drm.c
 	mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) -c $^ -o $@ $(LDFLAGS) $(LIBDRM) 
+	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) $(LIBDRM) 
+
+$(OBJDIR)main.o: main.c westonkill.c
+	mkdir -p $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
+
+$(OBJDIR)input.o: input.c touch_regions.c finger.c
+	mkdir -p $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) 
 
 $(OBJDIR)%.o: %.c
 	mkdir -p $(OBJDIR)

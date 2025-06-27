@@ -1,6 +1,10 @@
+/* not a standalone file! included directly in main.c */
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <unistd.h>
+
+#include "main.h"
 
 /* stops weston, returns false on error, true on success */
 bool kill_weston(void){
@@ -10,7 +14,8 @@ bool kill_weston(void){
     printf("could not kill weston | code: %d, aborting\n",code);
     return false;
   }
-
+  LOGR("KILL: WESTON",1);
+  
   int i;
   for (i = 0; i < 50; ++i) { /* Wait up to ~5 seconds */
     if (system("pidof weston > /dev/null") != 0) {
@@ -29,4 +34,5 @@ bool kill_weston(void){
 void restart_weston(void){
   system("mkdir -p $XDG_RUNTIME_DIR");
   system("weston &");
+  LOGR("START: WESTON",-1);
 }

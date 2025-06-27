@@ -12,6 +12,7 @@
 #include "ram.h"
 #include "peanut.h"
 #include "util.h"
+#include "main.h"
 
 #define SAVE_FILE_MAX_LENGTH 50 
 #define SAVE_LOCATION_FROM_HOME "/gbsaves/"
@@ -143,6 +144,7 @@ bool initalize_cart_ram(struct gb_s *gameboy, const char *const romName){
       puts("ERROR: Not enough memory for the cartrige RAM!");
       return false;
     }
+    LOGR("ALLOC: RAMDATA",1);
     
     int saveFile = open(saveFileName,O_RDONLY);
     if (saveFile < 0){
@@ -153,6 +155,7 @@ bool initalize_cart_ram(struct gb_s *gameboy, const char *const romName){
       memset(cartRamData,0, cartRamSize);
       return true;
     }
+    LOGR("ALLOC: SAVEFILE",1);
 
     int readSize;
 
@@ -168,6 +171,7 @@ bool initalize_cart_ram(struct gb_s *gameboy, const char *const romName){
         puts("Error: Failed to read entire file!");
 
       free(cartRamData); cartRamData = NULL;
+      LOGR("CLEAN: RAMDATA",-1);
       return false;
     }
 
@@ -176,6 +180,8 @@ bool initalize_cart_ram(struct gb_s *gameboy, const char *const romName){
 
     if (close(saveFile) != 0)
       perror("Error: could not close Savefile! errno");
+    else
+      LOGR("CLEAN: SAVEFILE",-1);
  
     return true;
   } 
@@ -188,6 +194,7 @@ file_does_not_exit:
     puts("ERROR: Not enough memory for the cartrige RAM!");
     return false;
   }
+  LOGR("ALLOC: RAMDATA",1);
 
   return true;
 }

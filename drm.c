@@ -17,7 +17,7 @@
 #include "peanut.h"
 #include "drm.h"
 #include "lcd.h"
-
+#include "main.h"
 
 volatile sig_atomic_t stop = 0; /* programms runs as long as this is unset */
 
@@ -126,17 +126,19 @@ bool setup_drm(void){
     perror("/dev/dri/card0 error");
     return false;
   }
-
+   LOGR("ALLOC: DRMMASTER",1); /* just assume we have master for now */
+  
   /* get drm resources */
 
   drmModeRes *resources = drmModeGetResources(drm_fd);
-        if (resources == NULL) {
-                perror("drmModeGetResources error");
-                return false;
-        }
+  LOGR("ALLOC: DRMMODERES",1);
+  if (resources == NULL) {
+    perror("drmModeGetResources error");
+    goto drm_resources_cleanup;
+  }
   if (resources->count_connectors == 0){
     puts("no connectors!");
-    return false;
+    goto drm_resources_cleanup;
   }
 
   if (resources->count_connectors > 1){
@@ -148,6 +150,7 @@ bool setup_drm(void){
 
   //struct connector *conn = NULL;
   drm_conn = drmModeGetConnector(drm_fd, resources->connectors[0]);
+  LOGR("ALLOC: DRMCONNECTOR",1);
   if (drm_conn == NULL){
     puts("error: connector was NULL!");
     goto drm_resources_cleanup;
@@ -178,14 +181,14 @@ bool setup_drm(void){
     goto drm_resources_conn_cleanup;
   }
 
-
   /* framebuffer 0 */
   fb0.width = H_RES;
   fb0.height = V_RES;
   fb0.bpp = BYTES_PER_PIXEL * 8;
 
   drmIoctl(drm_fd, DRM_IOCTL_MODE_CREATE_DUMB, &fb0);
-  
+  LOGR("ALLOC: FB0_D",1);
+ 
   {
     uint32_t handles[4] = { fb0.handle };
     uint32_t strides[4] = { fb0.pitch };
@@ -202,6 +205,7 @@ bool setup_drm(void){
   {
     struct drm_mode_map_dumb map = { .handle = fb0.handle };
     int ret = drmIoctl(drm_fd, DRM_IOCTL_MODE_MAP_DUMB, &map);
+    LOGR("ALLOC: FB0_M",1);
     if (ret < 0) {
       perror("DRM_IOCTL_MODE_MAP_DUMB failed to preapare map0");
       goto drm_resources_conn_fb0_cleanup;
@@ -223,6 +227,7 @@ bool setup_drm(void){
   fb1.bpp = BYTES_PER_PIXEL * 8;
 
   drmIoctl(drm_fd, DRM_IOCTL_MODE_CREATE_DUMB, &fb1);
+  LOGR("ALLOC: FB1_D",1);
   {
     uint32_t handles[4] = { fb1.handle };
     uint32_t strides[4] = { fb1.pitch };
@@ -239,6 +244,7 @@ bool setup_drm(void){
   {
     struct drm_mode_map_dumb map = { .handle = fb1.handle };
     int ret = drmIoctl(drm_fd, DRM_IOCTL_MODE_MAP_DUMB, &map);
+    LOGR("ALLOC: FB1_M",1);
     if (ret < 0) {
       perror("DRM_IOCTL_MODE_MAP_DUMB failed to preapare map1");
       goto drm_resources_conn_fb0_fb1_cleanup;
@@ -270,7 +276,8 @@ bool setup_drm(void){
 
 
   /* clean the mode resources */
-  drmModeFreeResources(resources);
+  drmModeFreeResources(resources); 
+  LOGR("CLEAN: DRMMODERES",-1);
 
   /* polling for Flip handler*/
 
@@ -286,23 +293,25 @@ bool setup_drm(void){
   /**** cleanup only reachable with goto: *******/
 
 drm_resources_conn_fb0_fb1_cleanup:
-  drmModeRmFB(drm_fd, fb1_id);
+  drmModeRmFB(drm_fd, fb1_id); LOGR("CLEAN: FB1_M",-1);
 drm_resources_conn_fb0_fb1_dumb_cleanup:
   {  
     struct drm_mode_destroy_dumb destroy = { .handle = fb1.handle };
     drmIoctl(drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
   }
+  LOGR("CLEAN: FB1_D",-1);
 drm_resources_conn_fb0_cleanup:
-  drmModeRmFB(drm_fd, fb0_id);
+  drmModeRmFB(drm_fd, fb0_id); LOGR("CLEAN: FB0_M",-1);
 drm_resources_conn_fb0_dumb_cleanup:
   {
     struct drm_mode_destroy_dumb destroy = { .handle = fb0.handle };
     drmIoctl(drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
   }
+  LOGR("CLEAN: FB0_D",-1);
 drm_resources_conn_cleanup:
-  drmModeFreeConnector(drm_conn);
+  drmModeFreeConnector(drm_conn); LOGR("CLEAN: DRMCONNECTOR",-1);
 drm_resources_cleanup:
-  drmModeFreeResources(resources);
+  drmModeFreeResources(resources); LOGR("CLEAN: DRMMODERES",-1);
 
   return false;
 }
@@ -311,6 +320,7 @@ void cleanup_drm(void){
 
   /* polling */
   pthread_join(pollDrmThread,NULL);
+  LOGR("THEAD END: POLLDRM",-1);
 
   /* fb0 */
 
@@ -319,7 +329,8 @@ void cleanup_drm(void){
     drmModeRmFB(drm_fd, fb0_id);
     struct drm_mode_destroy_dumb destroy = { .handle = fb0.handle };
     drmIoctl(drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
-    puts("\tcleaned up fb0");
+    LOGR("CLEAN: FB0_D",-1);
+    LOGR("CLEAN: FB0_M",-1);
   }
 
   /* fb1 */
@@ -329,7 +340,8 @@ void cleanup_drm(void){
     drmModeRmFB(drm_fd, fb1_id);
     struct drm_mode_destroy_dumb destroy = { .handle = fb1.handle };
     drmIoctl(drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
-    puts("\tcleaned up fb1");
+    LOGR("CLEAN: FB1_D",-1);
+    LOGR("CLEAN: FB1_M",-1);
   }
 
   /* restore saved mode */
@@ -344,11 +356,12 @@ void cleanup_drm(void){
 
   if (drm_conn != NULL){
     drmModeFreeConnector(drm_conn); drm_conn = NULL;
-    puts("\tFreed connector");
+    LOGR("CLEAN: DRMCONNECTOR",-1);
   }
 
   /* drop master */
   drmDropMaster(drm_fd); 
+  LOGR("CLEAN: DRMMASTER",-1);
 }
 
 
@@ -387,6 +400,8 @@ static uint32_t find_crtc(int drm_fd, drmModeRes *res, drmModeConnector *conn,
 
 
 static void *poll_drm_thread(void *data){
+  
+  LOGR("THREAD CREATE: POLLDRM",1);
 
   struct pollfd pollfd = {
 		.fd = drm_fd,
