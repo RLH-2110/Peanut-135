@@ -7,8 +7,16 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+typedef enum display_mode {
+  display_mode_default,
+  display_mode_wide,
+  display_mode_full_y,
+  display_mode_cut_y
+} display_mode_t;
+
 extern volatile sig_atomic_t stop; /* programms runs as long as this is unset */
 extern uint8_t line;
+extern display_mode_t displayMode;
 
 #define DROP_FRAMES 0 /* set to 1 to drop frames that would be send while the screen is drawing, instead of busy waiting for them*/
 #define LOG_DROPPED_FRAMES 1

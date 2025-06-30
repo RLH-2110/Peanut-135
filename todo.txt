@@ -1,1 +1,3 @@
-make function that saves safe file on exit, or termination signal
+GUI
+  Search for GB files if the CMD is not used
+  Allow changing display settings via INI file

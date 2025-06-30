@@ -8,6 +8,8 @@
 #include <libgen.h>
 #include <fcntl.h>
 #include <linux/input.h>
+#include <sys/stat.h>
+#include <ctype.h>
 
 
 /* peanut */
@@ -15,6 +17,8 @@
 
 #include "peanut_gb.h"
 
+/* inilib */
+#include "iniparser/src/iniparser.h"
 
 /* own includes */
 #include "rom.h"
@@ -23,8 +27,10 @@
 #include "drm.h"
 #include "input.h"
 #include "main.h"
+#include "util.h"
 
 #include "westonkill.c"
+
 
 /* GLOAL VARIBLES, EVEN OUTSID THIS FILE! */
     /* from rom.h */
@@ -38,14 +44,31 @@ size_t cartRamSize;
    /* from main.h */
 int resource_count = 0;
 
+   /* from drm.h*/
+display_mode_t displayMode;
+
 /* note: there is a thread safe varaible `stop` in drm.h thats global. if set to 1, the program will eventually terminate */
 
-/* renames */
-#define ROM_PATH argv[1]
+
+
+/* Other variables, only in main.c */
+
+#define MAX_NAME 80 
+char customSearchPath[MAX_NAME] = { '\0' };
+bool searchHome;
+bool searchExternal;
+bool autoLoad;
 
 
 void cleanup_and_exit(int exitCode);
 void gb_error(struct gb_s *gameboy, const enum gb_error_e gbError, const uint16_t addr);
+
+/* loads the config file using load_conf_vals (defined later)
+  useSystem: if false, loads the user conf, and calls itself with this as true on failue
+             if true, loads system wide conf, and uses default values on error
+*/
+void load_conf(bool useSystem); 
+ 
 
 /* signal handler */
 void on_termination(int signal){
@@ -71,7 +94,9 @@ int run_main(int argc, char **argv){
   signal(SIGINT,on_termination);
   signal(SIGTERM,on_termination);
 
-  if (load_rom_file(ROM_PATH) == false)
+  load_conf(false);
+
+  if (load_rom_file(argv[1]) == false)
     return EXIT_FAILURE;
 
   if (kill_weston() == false)
@@ -180,4 +205,116 @@ void gb_error(struct gb_s* gameboy, const enum gb_error_e gbError, const uint16_
   printf("Error: %s at address %04X\n",gbErrorStr[gbError],addr);  
   cleanup_and_exit(EXIT_FAILURE);
 
+}
+
+
+
+
+
+
+/* other functions */
+
+/* used by load_conf and load_sys_config to load the config cals with rini */
+void load_conf_vals( dictionary *ini ){
+
+  char const *ret = iniparser_getstring(ini, "launch:customSearchPath", "");
+  if (strlen(ret) > MAX_NAME - 1)
+    puts("Error: launch:customSearchPath is too long! Using Default value");
+  else
+    strcpy(customSearchPath,ret);
+
+  searchHome = iniparser_getboolean(ini, "launch:searchHome", true);
+  searchExternal = iniparser_getboolean(ini, "launch:searchExternal", true);
+  autoLoad = iniparser_getboolean(ini, "launch:autoLoad", false);
+  
+
+  char const *dispModeReadOnly = iniparser_getstring(ini,"display:mode","default"); 
+  char *dispMode = malloc(strlen(dispModeReadOnly)+1);
+  if (dispMode == NULL){
+    puts("Error: Out of memory when reading display:mode! Using default value.");
+    displayMode = display_mode_default;
+    return;
+  }
+  strcpy(dispMode,dispModeReadOnly);
+
+  for(int i = 0; dispMode[i] != '\0'; i++)
+    dispMode[i] = toupper(dispMode[i]);
+
+  if (strcmp(dispMode, "DEFAULT") == 0)
+    displayMode = display_mode_default;
+  else
+  if (strcmp(dispMode, "WIDE")    == 0)
+    displayMode = display_mode_wide;
+  else
+  if (strcmp(dispMode, "FULL_Y")  == 0)
+    displayMode = display_mode_full_y;
+  else
+  if (strcmp(dispMode, "CUT_Y")   == 0)
+    displayMode = display_mode_cut_y;
+  else{
+    printf("Warning: %s is not a valid display mode! using default value...\n",dispModeReadOnly);
+    displayMode = display_mode_default;
+  }
+ 
+}
+
+
+int get_file_size(int fd) {
+    struct stat st;
+    if (fstat(fd, &st) == 0) {
+        return st.st_size;
+    } else {
+        return -1;
+    }
+}
+
+
+/* loads the config file using load_conf_vals
+  useSystem: if false, loads the user conf, and calls itself with this as true on failue
+             if true, loads system wide conf, and uses default values on error
+*/
+void load_conf(bool useSystem){ 
+  
+#define MAX_USER_CONF_PATH_SIZE 64
+  char *home = getenv("HOME");
+  char *usrConfR = "/.config/peanut135/config.ini";
+  char usrConf[MAX_USER_CONF_PATH_SIZE] = { '\0' };
+  char *sysConf  = "/etc/peanut135/config.ini";
+
+  char *path;
+
+  if (useSystem == false){
+  
+    if (strlen(home) + strlen(usrConfR) + 1 >= MAX_USER_CONF_PATH_SIZE){
+      printf("Warning: can't load local config, File Path is logner than %d bytes!\n",MAX_USER_CONF_PATH_SIZE);
+      goto load_conf_error;
+    }
+
+    strcpy(usrConf,home);
+    strcpy(usrConf + strlen(home), usrConfR);
+    
+    path = usrConf;
+  }else{
+    path = sysConf;
+  }
+
+  dictionary *ini = iniparser_load(path); 
+  if (ini == NULL){
+    /* printf("Info: could not load ini file at %s\n",path); already printed by iniparser */
+    goto load_conf_error;
+  }
+
+  printf("Info: Loading config file %s...\n",path);
+  load_conf_vals(ini);
+
+  return;
+
+ /* only reachable via goto for cleanup */
+
+load_conf_error:
+  if (useSystem == false)
+    load_conf(true); /* try again with the system conf, if we dont already have */
+  else
+    puts("Warning: No config file could be loaded, using default values!");
+  return;
 }
