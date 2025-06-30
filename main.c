@@ -114,11 +114,10 @@ int run_main(int argc, char **argv){
   else
     puts("could not get local time!");
 
-  if(initalize_cart_ram(&gameboy, basename(argv[1])) == false)  
+  if(initalize_cart_ram(&gameboy, argv[1]) == false)  
     goto exit_cleanup;
 
   gameboy.direct.joypad = 0xFF;
-  printf("init on gameboy: %d\ninit my func: %d\n",gameboy.direct.joypad,get_input());
 
   while(!stop){
     gb_run_frame(&gameboy);
@@ -128,6 +127,13 @@ int run_main(int argc, char **argv){
     gameboy.direct.joypad = get_input();
  }
 
+  if (cartRamSize == 0){
+    puts("No Savefile created");
+  }else{
+    if (save_cart_ram(&gameboy, argv[1]) == true){
+      printf("Saved game to %s\n",get_save_name(argv[1]));
+    }
+  }
 
 exit_cleanup:
   cleanup_drm();
@@ -138,6 +144,7 @@ exit_early:
 
 
 void cleanup_and_exit(int exitCode){
+
   if (romData != NULL){
     if (unmap_rom(romData,romSize) != 0) /* just an munmap, but I can easily switch that if I decide on a different approach */    
       perror("Error: Failed to unmap rom! errno");
