@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "ram.h"
+#include "forktest/test_ram.h"
 #include "peanut.h"
 #include "util.h"
 #include "main.h"
@@ -18,6 +19,14 @@
 #define SAVE_LOCATION_FROM_HOME "/gbsaves/"
 #define SAVE_FILE_EXTENSION ".sav"
 #define SAVE_FILE_USABLE_LENGH SAVE_FILE_MAX_LENGTH - strlen(SAVE_FILE_EXTENSION) - strlen(SAVE_LOCATION_FROM_HOME) - strlen(homeDir) - 1
+
+
+/* for tests */
+bool testCartridgeRamOverwriteOn = false;
+int testCartridgeRamOverwrite = 0;
+bool testNeverLoadFromFileOverwrite = false;
+
+
 
 /*writes a byte to the RAM at the given address
   gb: unused
@@ -59,14 +68,30 @@ bool initalize_cart_ram(struct gb_s *gameboy, const char *const romName){
   /*initalize in case of early return*/
   cartRamData = NULL;
 
-  cartRamSize = gb_get_save_size(gameboy);
+  if (testCartridgeRamOverwriteOn == false){
+    if (gameboy == NULL){
+      puts("Error: gameboy can not be NULL in initalize_cart_ram");
+      return false;
+    }
+
+    if (gb_get_save_size_s(gameboy, &cartRamSize) != 0){
+      puts("Error: could not get cartridge ram size!");
+    }else
+      cartRamSize = 0; 
+
+  }else
+    cartRamSize = testCartridgeRamOverwrite;
 
   if (cartRamSize == 0)
     return true; /* no cartrige ram needed */
 
-
-  if (romName == NULL)
+  if (romName == NULL){
+    puts("Error: Please provie the romName in initalize_cart_ram, to get the save file name");
     return false;
+  }
+
+  if (testNeverLoadFromFileOverwrite)
+    goto file_does_not_exit;
 
   char *homeDir = getenv("HOME");
   if (homeDir == NULL){

@@ -7,7 +7,7 @@ LIBDRM += $(shell pkg-config --libs libdrm)
 all: $(TARGET)
 
 
-$(TARGET): $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJDIR)util.o $(OBJDIR)lcd.o  $(OBJDIR)drm.o $(OBJDIR)input.o
+$(TARGET): $(OBJDIR)tests.o $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJDIR)util.o $(OBJDIR)lcd.o  $(OBJDIR)drm.o $(OBJDIR)input.o 
 
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LIBDRM)
 	$(info    #############################################################################)
@@ -24,21 +24,26 @@ $(TARGET): $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJDIR)util.o $(OBJDI
 	$(info    $(LIBDRM))
 	$(info    #############################################################################)
 	
-$(OBJDIR)drm.o: drm.c
+$(OBJDIR)drm.o: drm.c peanut.h
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) $(LIBDRM) 
 
-$(OBJDIR)main.o: main.c westonkill.c peanut_gb.h
+$(OBJDIR)main.o: main.c westonkill.c peanut_gb.h main.h
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
 
-$(OBJDIR)input.o: input.c touch_regions.c finger.c
+$(OBJDIR)input.o: input.c touch_regions.c finger.c peanut.h
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) 
 
-$(OBJDIR)%.o: %.c
+$(OBJDIR)tests.o: forktest/tests.c peanut.h forktest/test_* main.h 
 	mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) -c $^ -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) 
+
+
+$(OBJDIR)%.o: %.c peanut.h forktest/test_*
+	mkdir -p $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
 
 clean:
 	rm -f $(TARGET)

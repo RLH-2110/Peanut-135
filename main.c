@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <linux/input.h>
 
+
 /* peanut */
 #define PEANUT_GB_IS_LITTLE_ENDIAN 1
 
@@ -52,8 +53,11 @@ void on_termination(int signal){
   stop = 1;
 }
 
-
-int main(int argc, char **argv){
+#if RLH_TEST == 0
+int main(int argc, char **argv){  /* } (for vim matching these: {} */
+#else
+int run_main(int argc, char **argv){
+#endif
   if (argc != 2) {
     printf("Error, %s needs only 1 argument!\n%s GB-FILE\n",argv[0],argv[0]);
     return EXIT_FAILURE;
@@ -62,7 +66,7 @@ int main(int argc, char **argv){
   if (init_input() == false)
     return EXIT_FAILURE;
 
-  struct gb_s gameboy;
+  struct gb_s gameboy = { 0 };
 
   signal(SIGINT,on_termination);
   signal(SIGTERM,on_termination);
@@ -112,15 +116,16 @@ int main(int argc, char **argv){
 
   if(initalize_cart_ram(&gameboy, basename(argv[1])) == false)  
     goto exit_cleanup;
-  
 
+  gameboy.direct.joypad = 0xFF;
+  printf("init on gameboy: %d\ninit my func: %d\n",gameboy.direct.joypad,get_input());
 
   while(!stop){
     gb_run_frame(&gameboy);
     display_frame(); 
 
     /* handle input */
-    gameboy.direct.joypad = get_input();    
+    gameboy.direct.joypad = get_input();
  }
 
 

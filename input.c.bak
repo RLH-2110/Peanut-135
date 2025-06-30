@@ -14,7 +14,7 @@
 #include "main.h"
 #include "button_map.h"
 
-#define DEBUG_INPUTS 0
+#define DEBUG_INPUTS 3
 
 #include "touch_regions.c" /* for debug stuff needs to be after the define */
 
@@ -28,8 +28,23 @@ void *touch_thread(void* data);
 
 pthread_mutex_t inputLock = PTHREAD_MUTEX_INITIALIZER;
 
-volatile uint_fast8_t button_presses = 0; 
-volatile uint_fast8_t button_presses_released = 0; 
+/* 
+  _____ __  __ _____   ____  _____ _______       _   _ _______ 
+ |_   _|  \/  |  __ \ / __ \|  __ \__   __|/\   | \ | |__   __|
+   | | | \  / | |__) | |  | | |__) | | |  /  \  |  \| |  | |   
+   | | | |\/| |  ___/| |  | |  _  /  | | / /\ \ | . ` |  | |   
+  _| |_| |  | | |    | |__| | | \ \  | |/ ____ \| |\  |  | |   
+ |_____|_|  |_|_|     \____/|_|  \_\ |_/_/    \_\_| \_|  |_|   
+                                                             
+  0xFF == no buttons pressed
+  0x00 == ALL buttons pressed
+
+  games may crash if all buttons are pressed!
+
+*/
+
+volatile uint_fast8_t button_presses = 0xFF; 
+volatile uint_fast8_t button_presses_released = 0xFF; 
 
 bool init_input(void){
   buttonsFd = open("/dev/input/event1", O_RDONLY | O_NONBLOCK);
@@ -72,13 +87,13 @@ bool init_input(void){
 
 uint8_t get_input(void){
 
-  uint8_t inputs = 0;  
+  uint8_t inputs = 0xFF;  
 
   pthread_mutex_lock(&inputLock); 
 
 #if DEBUG_INPUTS >= 2
   bool logThis = false;
-  if (button_presses != 0 || button_presses_released != 0){
+  if (button_presses != 0xFF || button_presses_released != 0xFF){
     logThis = true;
     printf("pre  button_presses  : %X\n",button_presses);
     printf("pre  button_presses_r: %X\n",button_presses_released);
@@ -86,8 +101,26 @@ uint8_t get_input(void){
 #endif
 
   inputs = button_presses; /* get pressed buttons */
-  button_presses ^= button_presses_released; /* remove released buttons, we still count them, since the user can not time their inputs precisly enough for each ms we check for button presses */
-  button_presses_released = 0;
+
+
+  /*
+R = button_presses_released
+P = button_presses
+   R P | Output
+  -----
+   0 0 | 1
+   0 1 | 1
+   1 0 | 0
+   1 1 | 1
+
+=
+~(R & ~P)
+
+0 means the button is pressed
+  */
+
+  button_presses = ~(button_presses_released & ~button_presses); /* remove released buttons, we still count them, since the user can not time their inputs precisly enough for each ms we check for button presses */
+  button_presses_released = 0xFF;
 
 #if DEBUG_INPUTS >= 2
   if (logThis){
@@ -97,26 +130,28 @@ uint8_t get_input(void){
 #endif
   pthread_mutex_unlock(&inputLock);
 
+  printf("inputs: %X\n");
+
 #if DEBUG_INPUTS
-  if (inputs & JOYPAD_A)
+  if (inputs & JOYPAD_A       == 0)
     puts("A is pressed");
-  if (inputs & JOYPAD_B)
+  if (inputs & JOYPAD_B       == 0)
     puts("B is pressed");
-  if (inputs & JOYPAD_SELECT)
+  if (inputs & JOYPAD_SELECT  == 0)
     puts("SELECT is pressed");
-  if (inputs & JOYPAD_START)
+  if (inputs & JOYPAD_START   == 0)
     puts("START is pressed");
-  if (inputs & JOYPAD_UP)
+  if (inputs & JOYPAD_UP      == 0)
     puts("UP is pressed");
-  if (inputs & JOYPAD_RIGHT)
+  if (inputs & JOYPAD_RIGHT   == 0)
     puts("RIGHT is pressed");
-  if (inputs & JOYPAD_DOWN)
+  if (inputs & JOYPAD_DOWN    == 0)
     puts("DOWN is pressed");
-  if (inputs & JOYPAD_LEFT)
+  if (inputs & JOYPAD_LEFT    == 0)
     puts("LEFT is pressed");
 #endif
 
-  return ~inputs; /* invert, because for the gameboy: 0 = pressed | 1 = not pressed */
+  return inputs;
 }
 
 void cleanup_input(void){
@@ -172,7 +207,7 @@ void *touch_thread(void* data){
         continue;
       }
 
-#if DEBUG_INPUTS >= 3
+#if DEBUG_INPUTS == 3
 {
     if (ev.type != EV_ABS)
       printf("touch type %hu code %hu value %d\n", ev.type, ev.code, ev.value);
@@ -225,19 +260,19 @@ void *touch_thread(void* data){
         }
 
       }else if (ev.type == EV_SYN){
-#if DEBUG_INPUTS >= 3
+#if DEBUG_INPUTS == 3
         puts("commiting inputs!");
 #endif       
 
         /* commit finger info! */
-        uint_fast8_t pressed_stuff = 0;
-        uint_fast8_t released_stuff = 0;
+        uint_fast8_t pressed_stuff  = 0xff;
+        uint_fast8_t released_stuff = 0xff;
 
         for (int i = 0; i < activeFingers; i++){ /* for all used fingers */
 
           touch_info_t *finger = &fingers[i];
 
-#if DEBUG_INPUTS >= 3
+#if DEBUG_INPUTS == 3
           print_finger(finger);          
 #endif
 
@@ -249,20 +284,20 @@ void *touch_thread(void* data){
 
           if (finger->released == true){
 
-            released_stuff |= mask;
+            released_stuff &= ~mask;
             finger->slot_used = false;
           }else{
-            pressed_stuff |= mask;
+            pressed_stuff &= ~mask;
           }
 
           if (finger->region != finger->region_previous){  /* unset buttons where the user moved their finger off them */
-            released_stuff |= translate_touch_region(finger->region_previous);
+            released_stuff &= ~translate_touch_region(finger->region_previous);
             finger->region_previous = finger->region;
           }
 
         } /* end of loop for every finger */
 
-#if DEBUG_INPUTS >= 3
+#if DEBUG_INPUTS == 3
         printf("activeFingers before clean: %d\n",activeFingers);
 #endif
 
@@ -270,16 +305,27 @@ void *touch_thread(void* data){
         while (activeFingers - 1 >= 0 && fingers[activeFingers - 1].slot_used == false)
           activeFingers--;
 
-#if DEBUG_INPUTS >= 3
+#if DEBUG_INPUTS == 3
         printf("activeFingers after clean:  %d\n",activeFingers);
 #endif
 
         /* set the inputs */
 
         /* fix up released regions, that are still pressed by other fingers */
-        released_stuff &= ~pressed_stuff; /* release buttons that are not pressed by other fingers */
+        /* if a button is pressed, then remove it from the released list */
+/*
+        R = released
+        P = pressed
+        
+        R P | OUTPUT
+        0 0 | 1
+        0 1 | 0
+        1 0 | 1
+        1 1 | 1
+*/
+        released_stuff |= ~pressed_stuff; 
 
-#if DEBUG_INPUTS >= 3
+#if DEBUG_INPUTS == 3
         printf("pressed  stuff: %X\n",pressed_stuff);
         printf("released stuff: %X\n",released_stuff);
 #endif
@@ -326,7 +372,7 @@ void *button_thread(void* data){
     if ( pollStruct.revents & POLLIN && read(buttonsFd, &ev, sizeof(ev)) == sizeof(ev)) {
 
 
-#if DEBUG_INPUTS >= 3
+#if DEBUG_INPUTS == 3
     printf("button type %hu code %hu value %d\n", ev.type, ev.code, ev.value);
 #endif
 
@@ -336,13 +382,15 @@ void *button_thread(void* data){
         if (ev.code == BTN_1){
           if (ev.value == 1){  /* pressed */
             pthread_mutex_lock(&inputLock); 
-            button_presses |= BTN_1_KEY; /* add to presses */
-            button_presses_released = button_presses_released & (~BTN_1_KEY); /* remove from released */
+printf("before:\n\tbp : %x\n\tbpr: %x\n");
+            button_presses &= ~BTN_1_KEY; /* add to presses */
+            button_presses_released &= ~BTN_1_KEY; /* remove from released */
+printf("after :\n\tbp : %x\n\tbpr: %x\n");
             pthread_mutex_unlock(&inputLock);
           }
           else{ /* released */
             pthread_mutex_lock(&inputLock); 
-            button_presses_released |= BTN_1_KEY; /* add to released */
+            button_presses_released &= ~BTN_1_KEY; /* add to released */
             pthread_mutex_unlock(&inputLock);
           }  
         }
@@ -351,13 +399,13 @@ void *button_thread(void* data){
         if (ev.code == BTN_2){
           if (ev.value == 1){  /* pressed */
             pthread_mutex_lock(&inputLock); 
-            button_presses |= BTN_2_KEY; /* add to presses */
-            button_presses_released = button_presses_released & (~BTN_2_KEY); /* remove from released */
+            button_presses &= ~BTN_2_KEY; /* add to presses */
+            button_presses_released &= ~BTN_2_KEY; /* remove from released */
             pthread_mutex_unlock(&inputLock);
           }
           else{ /* released */
             pthread_mutex_lock(&inputLock); 
-            button_presses_released |= BTN_2_KEY; /* add to released */
+            button_presses_released &= ~BTN_2_KEY; /* add to released */
             pthread_mutex_unlock(&inputLock);
           }  
         }
