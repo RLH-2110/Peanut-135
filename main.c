@@ -49,8 +49,9 @@ int resource_count = 0;
 display_mode_t displayMode;
 
    /* from blockmnt.h */
-char **roms = NULL;
-size_t romCount = 0;
+char *roms = NULL;
+size_t romsIndex = 0;
+size_t romsSize = 0;
 
 /* note: there is a thread safe varaible `stop` in drm.h thats global. if set to 1, the program will eventually terminate */
 
@@ -58,7 +59,7 @@ size_t romCount = 0;
 
 /* Other variables, only in main.c */
 
-char* romFile = NULL;
+char* romFile = "";
 
 #define MAX_NAME 80 
 char customSearchPath[MAX_NAME] = { '\0' };
@@ -97,28 +98,38 @@ int run_main(int argc, char **argv){
   signal(SIGTERM,on_termination);
   
   load_conf(false);
-  if( search_roms() == false)
-    goto exit_early;
-
+  if( search_roms(customSearchPath) == false)
+    cleanup_and_exit(EXIT_FAILURE);
 
   if (kill_weston() == false)
-    goto exit_early;
+    cleanup_and_exit(EXIT_FAILURE);
 
   if (setup_drm() == false)
-    goto exit_early;
+    cleanup_and_exit(EXIT_FAILURE);
 
-    if (argc >= 2) {
+
+  /* get rom from either arguments, autoLoad or lvgl */
+  if (argc >= 2) {
     romFile = argv[1];
   }else{
-    lvgl_main();
-    romFile = "calc.gb"; /* debug assignment */
+    if (autoLoad == false){
+      lvgl_main();
+    }else{
+      if (get_roms_count() == 1)
+        romFile = get_first_from_roms();
+      else
+        lvgl_main();
+    }
   }
 
+  if (romFile == "")
+    cleanup_and_exit(EXIT_SUCCESS);  /* this can only happen if the user exited lvgl without selecting a ROM, so the user did not select a ROM on purpose, and we can exit */
+
   if (load_rom_file(romFile) == false)
-    return EXIT_FAILURE;
+    cleanup_and_exit(EXIT_FAILURE);
 
   if (init_input() == false)
-    return EXIT_FAILURE;
+    cleanup_and_exit(EXIT_FAILURE);
 
   struct tm* localTime = NULL; 
   time_t currentTime = time(NULL);
@@ -175,13 +186,16 @@ int run_main(int argc, char **argv){
 
 exit_cleanup:
   cleanup_drm();
-exit_early:
   cleanup_and_exit(EXIT_SUCCESS);
 }
 
 
 
 void cleanup_and_exit(int exitCode){
+
+  if (roms != NULL){
+    free(roms); roms = NULL; romsSize = 0;
+  }
 
   if (romData != NULL){
     if (unmap_rom(romData,romSize) != 0) /* just an munmap, but I can easily switch that if I decide on a different approach */    

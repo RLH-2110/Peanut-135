@@ -5,7 +5,6 @@
 #define LOG_RESOURCES 1
 extern int resource_count;
 
-
 #if LOG_RESOURCES
 #   define LOGR(msg, inc) {\
       resource_count += inc;\

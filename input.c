@@ -21,8 +21,10 @@
 int buttonsFd = -1;
 int touchFd = -1;
 
+bool buttonThreadStarted = false;
 pthread_t buttonThread;
 void *button_thread(void* data);
+bool touchThreadStarted = false;
 pthread_t touchThread;
 void *touch_thread(void* data);
 
@@ -35,6 +37,7 @@ bool init_input(void){
   buttonsFd = open("/dev/input/event1", O_RDONLY | O_NONBLOCK);
   if (buttonsFd < 0){
     puts("Error: Failed to get button input!");
+    cleanup_input();
     return false;
   }
   LOGR("ALLOC: BUTTONSFD",1);
@@ -42,28 +45,24 @@ bool init_input(void){
   touchFd = open("/dev/input/event0", O_RDONLY | O_NONBLOCK);
   if (touchFd < 0){
     puts("Error: Failed to get touchpad input!");
-    close(buttonsFd); LOGR("CLEAN: BUTTONSFD",-1);
+    cleanup_input();
     return false;
   }
   LOGR("ALLOC: TOUCHFD",1);
 
   if (pthread_create( &buttonThread, NULL, button_thread,NULL) != 0){
     puts("Error: could not create button thread");
-    close(buttonsFd); LOGR("CLEAN: BUTTONSFD",-1);
-    close(touchFd);   LOGR("CLEAN: TOUCHFD",-1);
+    cleanup_input();
     return false;
   }
+  buttonThreadStarted = true;
 
   if (pthread_create( &touchThread, NULL, touch_thread,NULL) != 0){
     puts("Error: could not create touch thread");
-    
-    pthread_join(buttonThread,NULL); LOGR("END THREAD: BUTTON",-1);
-
-    close(buttonsFd); LOGR("CLEAN: BUTTONSFD",-1);
-    close(touchFd);   LOGR("CLEAN: TOUCHFD",-1);
+    cleanup_input();
     return false;
   }
-
+  touchThreadStarted = true;
 
 
   return true;
@@ -121,17 +120,23 @@ uint8_t get_input(void){
 
 void cleanup_input(void){
 
-  pthread_join(buttonThread,NULL);
-  LOGR("END THREAD: BUTTON",-1);
+  if (buttonThreadStarted){
+    pthread_join(buttonThread,NULL);
+    LOGR("END THREAD: BUTTON",-1);
+    buttonThreadStarted = false;
+  }
 
-  pthread_join(touchThread,NULL);
-  LOGR("END THREAD: TOUCH",-1);
+  if (touchThreadStarted){
+    pthread_join(touchThread,NULL);
+    LOGR("END THREAD: TOUCH",-1);
+    touchThreadStarted = false;
+  }
 
   if (buttonsFd >= 0){
-    close(buttonsFd); LOGR("CLEAN: BUTTONFD",-1);
+    close(buttonsFd); LOGR("CLEAN: BUTTONFD",-1); buttonsFd = -1;
   }
   if (touchFd >= 0){
-    close(touchFd); LOGR("CLEAN: TOUCHFD",-1);
+    close(touchFd); LOGR("CLEAN: TOUCHFD",-1); touchFd = -1;
   }
 }
 

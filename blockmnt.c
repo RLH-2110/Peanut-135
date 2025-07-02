@@ -9,6 +9,7 @@
 #include <ctype.h>
 #include <blkid/blkid.h>
 #include <sys/mount.h>
+#include <dirent.h>
 
 
 #include "main.h"
@@ -17,23 +18,143 @@
 
 #define DEBUG_BLOCKMNT 0
 
-/* finds roms, and creates a list of them into `roms` and upadtes `romsCount`*/
-bool search_roms(void){
-  if (find_and_mount() == false)
+/* returns the frist rom in roms or NULL */
+char* get_first_from_roms(void){
+  if (roms == NULL)
+    return NULL;
+  
+  if (romsIndex == 0)
+    return NULL;
+
+  return roms;
+}
+
+/* -------------------------------------------------------------- */
+
+/*gets the amount of roms in roms */
+unsigned int get_roms_count(void){
+  if (roms == NULL)
+    return 0;
+  if (romsIndex == 0)
+    return 0;
+
+  size_t localRomsIndex = 0;
+  unsigned int count = 0;
+
+  while(localRomsIndex < romsIndex){
+    count++;
+    localRomsIndex += strlen(roms + localRomsIndex) + 1;
+  }
+  return count;
+}
+
+/* -------------------------------------------------------------- */
+
+/* modifies heapBuffer, heapBuffSize and heapBuffIndex! */
+void scan_path(char* path, char* heapBuffer, size_t *heapBuffSize, size_t *heapBuffIndex){
+  if (path == NULL || heapBuffer == NULL || heapBuffSize == NULL || heapBuffIndex == NULL)
+    return;
+
+#if DEBUG_BLOCKMNT 
+  printf("scanning %s\n",path);
+#endif
+
+  DIR *dir = opendir(path);
+  if (dir == NULL){
+    printf("could not open directory %s",path);
+    return;
+  }
+  LOGR("Open: Directory",1);
+  
+  /* search all file entries for .gb files */
+  struct dirent *dirEntry;
+  while(true){
+    dirEntry = readdir(dir);
+    if (dirEntry == NULL)
+      break;
+
+    size_t len = strlen(dirEntry->d_name);
+    if (len < strlen(".gb") || strcmp (dirEntry->d_name + len - strlen(".gb"), ".gb") != 0)  /*check of the last 3 chars are ".gb" */
+      continue; /* not a gb file */
+
+    /* a gb file! */
+ 
+    /* check if buffer is big enough */
+    if (*heapBuffSize - *heapBuffIndex < len){
+      if (EXPAND(heapBuffer,*heapBuffSize) == false){
+        puts("Not enogh free Memory!");
+        *heapBuffSize = 0; 
+        LOGR("Clean: ROMS",-1);
+        return;
+      }
+    } 
+
+    strcpy(heapBuffer + *heapBuffIndex,dirEntry->d_name);
+    *heapBuffIndex += len+1;
+  }
+
+
+  if(closedir(dir) != 0)
+    perror("could not close directory! Errno");
+  else
+    LOGR("Clean: Directory",-1);
+}
+
+/* -------------------------------------------------------------- */
+
+/* finds roms, and creates a list of them into `roms` and upadtes `romsSize` and `romsIndex` */
+bool search_roms(char* customSearchPath){
+
+  romsSize = 0xFF;
+  romsIndex = 0;
+  roms = malloc(romsSize);
+  if (roms == NULL){
+    puts("Not enough memory!");
     return false;
+  }
+  LOGR("Alloc: ROMS",1);
+
+  if (find_and_mount() == false){
+    free(roms); roms = NULL; romsSize = 0;
+    LOGR("Clean: ROMS",-1);
+    return false;
+  }
+
 
   /* scan custom path*/
+  if (customSearchPath != NULL){
+    scan_path(customSearchPath,roms,&romsSize, &romsIndex);
+  }  
 
   /* scan mounted stuff */
 
   mount_list_t *mountedSCSI = get_mounted_partitions();
+  mount_list_t *current = mountedSCSI;
 
-  free_mount_list(mount_list_t);
+  while(current != NULL){
+    scan_path(current->mountPoint,roms,&romsSize, &romsIndex);
+    current = current->next;
+  }
+  free_mount_list(mountedSCSI);
 
   /* scan home */
+  char *home = getenv("HOME");
+  if (home == NULL)
+    puts("Warning: Can't find home directory!");
+  else
+    scan_path(home,roms,&romsSize, &romsIndex);
 
-  roms;
-  romCount;
+  printf("--\nromsIndex: %d\nromsSize: %d\nroms:\n",romsIndex,romsSize);
+  for (int i = 0; i < romsIndex; i++){
+    if (roms[i] == '\0')
+      printf("\n");
+    else
+      putchar(roms[i]);
+  }
+  puts("--");
+
+  free(roms); roms = NULL; romsSize = 0;
+  LOGR("Clean: ROMS",-1);
 
 
   return true;
@@ -122,6 +243,8 @@ bool find_and_mount(void){
 
     for (*partionNum = '1'; *partionNum <= '9'; (*partionNum)++){
 
+      *devPartitonNum = *partionNum;
+
       /* check if exists */
       if (stat(devicePath, &st) != 0 || S_ISDIR(st.st_mode) == false){ /* is not a dir */
         break;
@@ -130,13 +253,22 @@ bool find_and_mount(void){
       /* check if already mounted */
       bool isMounted = false;
       for (mount_list_t *current = alreadyMounted; current != NULL; current = current->next){
-        if (strcmp(devicePath,current->device) == 0){
+#ifdef DEBUG_BLOCKMNT
+        printf("comparing %s and %s to see if its already mounted\n",devPath,current->device);
+#endif
+        if (strcmp(devPath,current->device) == 0){
+#ifdef DEBUG_BLOCKMNT
+          puts("alredy mounted");
+#endif
           isMounted = true;
           break;
         }
       }
       if (isMounted)
         continue;
+#ifdef DEBUG_BLOCKMNT
+      puts("not mounted");
+#endif
 
       if (sizeof(devicePath) + heapIndex >= heapSize){ /* expand memory, if we have too little */
         if (EXPAND(heap,heapSize) == false){
@@ -145,8 +277,6 @@ bool find_and_mount(void){
           return false;
         }
       }
-      
-      *devPartitonNum = *partionNum;
 
       strcpy((uint8_t*)(heap+heapIndex),devPath); /* add to list of partitions to mount */
       heapIndex += sizeof(devPath);
@@ -195,8 +325,8 @@ bool find_and_mount(void){
       char* fs = get_partition_filesystem(HEAP_STRING);
       if (fs != NULL){
         if (mount(HEAP_STRING, mountPoint, fs, 0, NULL) != 0){
-          printf("Error: can not mount %s to %s as %s ",HEAP_STRING,mountPoint,fs);
-          perror("Errno");
+          printf("Error: can not mount %s to %s as %s\n",HEAP_STRING,mountPoint,fs);
+          perror("\tErrno");
         }
       }
       
