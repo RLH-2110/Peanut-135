@@ -61,23 +61,47 @@ static void page_flip_handler(int drm_fd, unsigned sequence, unsigned tv_sec,	un
   waitForFlip = 0;
 }
 
+
+#include "lvgl/lvgl.h"
+
+/* LVGL callback */
+void flush_cb(lv_display_t * display, const lv_area_t * area, uint8_t * px_map)
+{
+    if (waitForFlip != 0)
+    {
+#if LOG_DROPPED_FRAMES
+      printf("dropped frame at %d\n",time(NULL));
+#endif
+      lv_display_flush_ready(display);
+      return;
+    }
+
+    uint8_t * buff8 = px_map; /* 16 bit (RGB565) */
+    int32_t area_width = (area->x2 - area->x1 + 1) * BYTES_PER_PIXEL;
+    int32_t x,y;
+
+    for(y = area->y1; y <= area->y2; y++) {
+        uint8_t *dest = back_fb_data + (fb0.pitch * y) + (area->x1 * BYTES_PER_PIXEL);
+        memcpy( dest , buff8, area_width);
+        buff8 += area_width;
+    }
+    waitForFlip = 1;
+
+    if (drmModePageFlip(  drm_fd, crtc, back_fb, DRM_MODE_PAGE_FLIP_EVENT, NULL) != 0){
+      perror("PageFLip in flush_cb");
+      waitForFlip = 0;
+    }
+
+    lv_display_flush_ready(display);
+
+}
+
 uint8_t line = 0;
 void draw_drm_line(uint16_t pixels[LCD_WIDTH])
 {
 
-#if DROP_FRAMES
-  if (waitForFlip != 0)
-  {
-#if LOG_DROPPED_FRAMES
-    //printf("dropped frame at %d\n",time(NULL));
-    printf("dropped frame %d\n",frameCount);
-#endif
-    return;
-  }
-#else
   while(waitForFlip)
     ;
-#endif
   
   uint8_t * buff8 = (uint8_t*) pixels; /* 16 bit (RGB565) */
   int32_t area_width = LCD_WIDTH * BYTES_PER_PIXEL;
@@ -92,19 +116,8 @@ void draw_drm_line(uint16_t pixels[LCD_WIDTH])
 
 void display_frame(){
 
-#if DROP_FRAMES
-  if (waitForFlip != 0)
-  {
-#if LOG_DROPPED_FRAMES
-    //printf("dropped frame at %d\n",time(NULL));
-    printf("dropped frame %d\n",frameCount);
-#endif
-    return;
-  }
-#else
-  while(waitForFlip)
+ while(waitForFlip)
     ;
-#endif
 
   frameCount++;
   waitForFlip = 1;
@@ -116,6 +129,7 @@ void display_frame(){
 
   line = 0;
 }
+
 
 /* false = failed | true = success */
 bool setup_drm(void){

@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <ctype.h>
 
+#include "lvgl.c"
 
 /* peanut */
 #define PEANUT_GB_IS_LITTLE_ENDIAN 1
@@ -28,9 +29,9 @@
 #include "input.h"
 #include "main.h"
 #include "util.h"
+#include "blockmnt.h"
 
 #include "westonkill.c"
-
 
 /* GLOAL VARIBLES, EVEN OUTSID THIS FILE! */
     /* from rom.h */
@@ -47,11 +48,17 @@ int resource_count = 0;
    /* from drm.h*/
 display_mode_t displayMode;
 
+   /* from blockmnt.h */
+char **roms = NULL;
+size_t romCount = 0;
+
 /* note: there is a thread safe varaible `stop` in drm.h thats global. if set to 1, the program will eventually terminate */
 
 
 
 /* Other variables, only in main.c */
+
+char* romFile = NULL;
 
 #define MAX_NAME 80 
 char customSearchPath[MAX_NAME] = { '\0' };
@@ -68,7 +75,7 @@ void gb_error(struct gb_s *gameboy, const enum gb_error_e gbError, const uint16_
              if true, loads system wide conf, and uses default values on error
 */
 void load_conf(bool useSystem); 
- 
+
 
 /* signal handler */
 void on_termination(int signal){
@@ -76,28 +83,23 @@ void on_termination(int signal){
   stop = 1;
 }
 
+
+
 #if RLH_TEST == 0
 int main(int argc, char **argv){  /* } (for vim matching these: {} */
 #else
 int run_main(int argc, char **argv){
 #endif
-  if (argc != 2) {
-    printf("Error, %s needs only 1 argument!\n%s GB-FILE\n",argv[0],argv[0]);
-    return EXIT_FAILURE;
-  }
-  
-  if (init_input() == false)
-    return EXIT_FAILURE;
-
+    
   struct gb_s gameboy = { 0 };
 
   signal(SIGINT,on_termination);
   signal(SIGTERM,on_termination);
-
+  
   load_conf(false);
+  if( search_roms() == false)
+    goto exit_early;
 
-  if (load_rom_file(argv[1]) == false)
-    return EXIT_FAILURE;
 
   if (kill_weston() == false)
     goto exit_early;
@@ -105,7 +107,18 @@ int run_main(int argc, char **argv){
   if (setup_drm() == false)
     goto exit_early;
 
+    if (argc >= 2) {
+    romFile = argv[1];
+  }else{
+    lvgl_main();
+    romFile = "calc.gb"; /* debug assignment */
+  }
 
+  if (load_rom_file(romFile) == false)
+    return EXIT_FAILURE;
+
+  if (init_input() == false)
+    return EXIT_FAILURE;
 
   struct tm* localTime = NULL; 
   time_t currentTime = time(NULL);
@@ -139,7 +152,7 @@ int run_main(int argc, char **argv){
   else
     puts("could not get local time!");
 
-  if(initalize_cart_ram(&gameboy, argv[1]) == false)  
+  if(initalize_cart_ram(&gameboy, romFile) == false)  
     goto exit_cleanup;
 
   gameboy.direct.joypad = 0xFF;
@@ -155,8 +168,8 @@ int run_main(int argc, char **argv){
   if (cartRamSize == 0){
     puts("No Savefile created");
   }else{
-    if (save_cart_ram(&gameboy, argv[1]) == true){
-      printf("Saved game to %s\n",get_save_name(argv[1]));
+    if (save_cart_ram(&gameboy, romFile) == true){
+      printf("Saved game to %s\n",get_save_name(romFile));
     }
   }
 
@@ -259,16 +272,6 @@ void load_conf_vals( dictionary *ini ){
 }
 
 
-int get_file_size(int fd) {
-    struct stat st;
-    if (fstat(fd, &st) == 0) {
-        return st.st_size;
-    } else {
-        return -1;
-    }
-}
-
-
 /* loads the config file using load_conf_vals
   useSystem: if false, loads the user conf, and calls itself with this as true on failue
              if true, loads system wide conf, and uses default values on error
@@ -318,3 +321,4 @@ load_conf_error:
     puts("Warning: No config file could be loaded, using default values!");
   return;
 }
+

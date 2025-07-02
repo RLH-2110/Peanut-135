@@ -1,3 +1,5 @@
+include lvgl/lvgl.mk
+
 TARGET = peanut135
 OBJDIR = obj/
 CFLAGS += -Werror
@@ -6,9 +8,17 @@ LIBDRM += $(shell pkg-config --libs libdrm)
 
 INICODE = $(OBJDIR)iniparser.o $(OBJDIR)dictionary.o
 
+LDFLAGS += -lblkid
+
+CURR_DIR = $(shell pwd)
+LVGL_SRCFILES := $(ASRCS) $(CSRCS)
+# Convert absolute paths to relative paths under obj/
+LVGL_OBJFILES := $(patsubst $(CURR_DIR)/%.c,obj/%.o,$(filter %.c,$(CSRCS))) \
+                 $(patsubst $(CURR_DIR)/%.S,obj/%.o,$(filter %.S,$(ASRCS)))
+
 all: $(TARGET)
 
-$(TARGET): $(OBJDIR)tests.o $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJDIR)util.o $(OBJDIR)lcd.o  $(OBJDIR)drm.o $(OBJDIR)input.o $(OBJDIR)rini.o $(INICODE)
+$(TARGET): $(OBJDIR)tests.o $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJDIR)util.o $(OBJDIR)lcd.o  $(OBJDIR)drm.o $(OBJDIR)input.o $(OBJDIR)blockmnt.o $(INICODE) $(LVGL_OBJFILES)
 
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LIBDRM)
 	$(info    #############################################################################)
@@ -25,10 +35,6 @@ $(TARGET): $(OBJDIR)tests.o $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJD
 	$(info    $(LIBDRM))
 	$(info    #############################################################################)
 	
-$(OBJDIR)rini.o: librini/src/rini.c
-	mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) $(LIBDRM) 
-
 $(OBJDIR)drm.o: drm.c peanut.h
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) $(LIBDRM) 
@@ -46,9 +52,17 @@ $(OBJDIR)tests.o: forktest/tests.c peanut.h forktest/test_* main.h
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) 
 
 
+
+
 $(OBJDIR)%.o: %.c peanut.h forktest/test_*
-	mkdir -p $(OBJDIR)
+	#mkdir -p $(OBJDIR)
+	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
+
+$(OBJDIR)%.o: %.S 
+	#mkdir -p $(OBJDIR) 
+	mkdir -p $(dir $@)
+	$(CC) $(AFLAGS) -c $< -o $@ $(LDFLAGS)
 
 clean:
 	rm -f $(TARGET)
