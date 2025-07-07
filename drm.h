@@ -12,7 +12,9 @@ typedef enum display_mode {
   display_mode_default,
   display_mode_wide,
   display_mode_full_y,
-  display_mode_cut_y
+  display_mode_cut_y,
+
+  display_mode_size
 } display_mode_t;
 
 extern volatile sig_atomic_t stop; /* programms runs as long as this is unset */
@@ -40,6 +42,8 @@ void display_frame();
 /* LVGL flush callback */
 #include "lvgl/lvgl.h"
 void flush_cb(lv_display_t * display, const lv_area_t * area, uint8_t * px_map);
+
+void clear_screen();
 
 /* INCLUDED_DRM_H */
 #endif

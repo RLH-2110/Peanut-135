@@ -33,8 +33,10 @@ char* get_first_from_roms(void){
 
 /*gets the amount of roms in roms */
 unsigned int get_roms_count(void){
-  if (roms == NULL)
+  if (roms == NULL){
+    puts("Error: ROMS is NULL, cant get ROM count!");
     return 0;
+  }
   if (romsIndex == 0)
     return 0;
 
@@ -43,15 +45,17 @@ unsigned int get_roms_count(void){
 
   while(localRomsIndex < romsIndex){
     count++;
+    printf("found rom: %s\n",roms + localRomsIndex);
     localRomsIndex += strlen(roms + localRomsIndex) + 1;
   }
+
   return count;
 }
 
 /* -------------------------------------------------------------- */
 
 /* modifies heapBuffer, heapBuffSize and heapBuffIndex! */
-void scan_path(char* path, char* heapBuffer, size_t *heapBuffSize, size_t *heapBuffIndex){
+void scan_path(char* path, char* heapBuffer, size_t *heapBuffSize, size_t *heapBuffIndex, bool onlyGb, bool excludeDirs, bool prefixPath ){
   if (path == NULL || heapBuffer == NULL || heapBuffSize == NULL || heapBuffIndex == NULL)
     return;
 
@@ -61,7 +65,7 @@ void scan_path(char* path, char* heapBuffer, size_t *heapBuffSize, size_t *heapB
 
   DIR *dir = opendir(path);
   if (dir == NULL){
-    printf("could not open directory %s",path);
+    printf("could not open directory %s\n",path);
     return;
   }
   LOGR("Open: Directory",1);
@@ -74,13 +78,29 @@ void scan_path(char* path, char* heapBuffer, size_t *heapBuffSize, size_t *heapB
       break;
 
     size_t len = strlen(dirEntry->d_name);
-    if (len < strlen(".gb") || strcmp (dirEntry->d_name + len - strlen(".gb"), ".gb") != 0)  /*check of the last 3 chars are ".gb" */
-      continue; /* not a gb file */
 
-    /* a gb file! */
+    if (strcmp (dirEntry->d_name, ".") == 0) /* filter out . */
+      continue;
+    if (strcmp (dirEntry->d_name, "..") == 0) /* filter out .. */
+      continue;
+
+
+    if (excludeDirs && is_dir_path(path,dirEntry->d_name)) /* exclude dirs, if nessesary */
+      continue;
+
+    if (onlyGb && is_dir_path(path,dirEntry->d_name) == false){ /* if its a directory skip the check. if its not a directory, then only do this is the filter for only gb files */
+      if (len < sizeof(".gb") || strcmp (dirEntry->d_name + len - strlen(".gb"), ".gb") != 0){  /*check of the last 3 chars are ".gb" */
+        continue; /* not a gb file */
+      }
+
+      /* a gb file! */
+    }
  
+    if (prefixPath)
+      len += strlen(path);
+
     /* check if buffer is big enough */
-    if (*heapBuffSize - *heapBuffIndex < len){
+    if (*heapBuffSize - *heapBuffIndex < len + 1 ){
       if (EXPAND(heapBuffer,*heapBuffSize) == false){
         puts("Not enogh free Memory!");
         *heapBuffSize = 0; 
@@ -89,8 +109,12 @@ void scan_path(char* path, char* heapBuffer, size_t *heapBuffSize, size_t *heapB
       }
     } 
 
-    strcpy(heapBuffer + *heapBuffIndex,dirEntry->d_name);
-    *heapBuffIndex += len+1;
+    if (prefixPath)
+      path_construct(heapBuffer + *heapBuffIndex,*heapBuffSize - *heapBuffIndex, path, dirEntry->d_name); // save the full path
+    else
+      strcpy(heapBuffer + *heapBuffIndex,dirEntry->d_name); // save filename only 
+
+    *heapBuffIndex += strlen(heapBuffer + *heapBuffIndex) + 1;
   }
 
 
@@ -123,7 +147,7 @@ bool search_roms(char* customSearchPath){
 
   /* scan custom path*/
   if (customSearchPath != NULL){
-    scan_path(customSearchPath,roms,&romsSize, &romsIndex);
+    scan_path(customSearchPath,roms,&romsSize, &romsIndex, true,true,true);
   }  
 
   /* scan mounted stuff */
@@ -132,7 +156,7 @@ bool search_roms(char* customSearchPath){
   mount_list_t *current = mountedSCSI;
 
   while(current != NULL){
-    scan_path(current->mountPoint,roms,&romsSize, &romsIndex);
+    scan_path(current->mountPoint,roms,&romsSize, &romsIndex, true, true,true);
     current = current->next;
   }
   free_mount_list(mountedSCSI);
@@ -142,7 +166,7 @@ bool search_roms(char* customSearchPath){
   if (home == NULL)
     puts("Warning: Can't find home directory!");
   else
-    scan_path(home,roms,&romsSize, &romsIndex);
+    scan_path(home,roms,&romsSize, &romsIndex, true, true, true);
 
   printf("--\nromsIndex: %d\nromsSize: %d\nroms:\n",romsIndex,romsSize);
   for (int i = 0; i < romsIndex; i++){
@@ -153,16 +177,12 @@ bool search_roms(char* customSearchPath){
   }
   puts("--");
 
-  free(roms); roms = NULL; romsSize = 0;
-  LOGR("Clean: ROMS",-1);
-
-
   return true;
 }
 
 /* -------------------------------------------------------------- */
 
-/* gets file system string for a partion path 
+/* gets file system string for a partion path (like "vfat") 
     devicePath: a path like /dev/sda1
     returns: pointer to internal static buffer, that will be overwritten with each call to this function.
              or returns NULL on error.
@@ -213,7 +233,6 @@ bool find_and_mount(void){
   LOGR("Alloc: MOUNT HEAP",1);
 
   /* see img/code/devicePath.png for a visual explenation */
-  struct stat st;
   char devicePath[] = "/sys/block/sda\0sda1";
   char *pathSeperator = &devicePath[strlen(devicePath)]; /* positon on where the path seperator will be*/
   char *deviceLetter = &devicePath[strlen(devicePath)-1]; /* this is the 'a' in sda */
@@ -228,12 +247,12 @@ bool find_and_mount(void){
 
   mount_list_t *alreadyMounted = get_mounted_partitions();
 
-  puts("done, doing other sh1t");
+  puts("finished getting the mount list");
 
   /* find all external partitions */
   for (;*deviceLetter <= 'z';(*deviceLetter)++){
 
-    if (stat(devicePath, &st) != 0 || S_ISDIR(st.st_mode) == false){ /* is not a dir */
+    if (is_dir(devicePath,-1) == false){ /* is not a dir */
       continue;
     }
 
@@ -246,18 +265,18 @@ bool find_and_mount(void){
       *devPartitonNum = *partionNum;
 
       /* check if exists */
-      if (stat(devicePath, &st) != 0 || S_ISDIR(st.st_mode) == false){ /* is not a dir */
+      if (is_dir(devicePath, -1)  == false){ /* is not a dir */
         break;
       }
 
       /* check if already mounted */
       bool isMounted = false;
       for (mount_list_t *current = alreadyMounted; current != NULL; current = current->next){
-#ifdef DEBUG_BLOCKMNT
+#if DEBUG_BLOCKMNT
         printf("comparing %s and %s to see if its already mounted\n",devPath,current->device);
 #endif
         if (strcmp(devPath,current->device) == 0){
-#ifdef DEBUG_BLOCKMNT
+#if DEBUG_BLOCKMNT
           puts("alredy mounted");
 #endif
           isMounted = true;
@@ -266,7 +285,7 @@ bool find_and_mount(void){
       }
       if (isMounted)
         continue;
-#ifdef DEBUG_BLOCKMNT
+#if DEBUG_BLOCKMNT
       puts("not mounted");
 #endif
 
@@ -291,14 +310,16 @@ bool find_and_mount(void){
     each string tells us a partition to mount
   */
 
-  puts("\n\nfound unmounted SCSI block Devices:");
+  if (heapIndex != 0) /* only print string, if we found any */
+    puts("\nfound unmounted SCSI block Devices:");
+
   for (int i = 0; i < heapIndex; i++){
     if (heap[i] == '\0')
       putchar('\n');
     else
       putchar(heap[i]);
   }
-  puts("\n\n");
+  puts("\n");
 
   /* create mount directories and mount */
 
@@ -320,7 +341,7 @@ bool find_and_mount(void){
     if (mkdir(mountPoint, 0x777) != 0 && errno != EEXIST) /* create dir, and ignore if the error is that it already exists */
       printf("Error: could not create mount dir %s\n",mountPoint);
 
-    if (stat(mountPoint, &st) == 0 || S_ISDIR(st.st_mode) == true){
+    if (is_dir(mountPoint, -1) == true){ 
       
       char* fs = get_partition_filesystem(HEAP_STRING);
       if (fs != NULL){
@@ -501,4 +522,28 @@ void free_mount_list(mount_list_t *list){
 
     LOGR("Clean: MOUNT_LIST ELEMENT",-1);
   }
+}
+
+
+/* -------------------------------------------------------------- */
+
+/* gets mount point from partition path. so for /dev/sda1 is might find /mnt/foo  */
+/* taks in paths like /dev/sda1 or /dev/sdb8 */
+/* returns: NULL if not found, or mounth path, if found*/
+char* find_mount_point(char* partitionPath){
+  mount_list_t *mountedSCSI = get_mounted_partitions();
+  mount_list_t *current = mountedSCSI;
+  
+  char *found = NULL;
+
+  while(current != NULL){
+    if (strcmp(partitionPath, current->device) == 0){
+      found = current->mountPoint;
+      break;
+    }
+    current = current->next;
+  }
+
+  free_mount_list(mountedSCSI);
+  return found;
 }

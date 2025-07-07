@@ -1,0 +1,3 @@
+regex to find only LOGR output by replacing all other lines with nothing:
+  ^(?!.*RESOURCES).*$
+

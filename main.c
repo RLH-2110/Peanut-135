@@ -11,8 +11,6 @@
 #include <sys/stat.h>
 #include <ctype.h>
 
-#include "lvgl.c"
-
 /* peanut */
 #define PEANUT_GB_IS_LITTLE_ENDIAN 1
 
@@ -59,7 +57,7 @@ size_t romsSize = 0;
 
 /* Other variables, only in main.c */
 
-char* romFile = "";
+char* romFile = NULL;
 
 #define MAX_NAME 80 
 char customSearchPath[MAX_NAME] = { '\0' };
@@ -85,6 +83,7 @@ void on_termination(int signal){
 }
 
 
+#include "lvgl.c"
 
 #if RLH_TEST == 0
 int main(int argc, char **argv){  /* } (for vim matching these: {} */
@@ -108,6 +107,8 @@ int run_main(int argc, char **argv){
     cleanup_and_exit(EXIT_FAILURE);
 
 
+printf("\n\nROM count: %d\n",get_roms_count());
+
   /* get rom from either arguments, autoLoad or lvgl */
   if (argc >= 2) {
     romFile = argv[1];
@@ -122,8 +123,13 @@ int run_main(int argc, char **argv){
     }
   }
 
-  if (romFile == "")
-    cleanup_and_exit(EXIT_SUCCESS);  /* this can only happen if the user exited lvgl without selecting a ROM, so the user did not select a ROM on purpose, and we can exit */
+  printf("reached main! romFile: %s\n",romFile);
+
+  clear_screen();
+  puts("cleared screen");
+
+  if (romFile == NULL || *romFile == '\0')
+    cleanup_and_exit(EXIT_SUCCESS); /* this can only happen if the user exited lvgl without selecting a ROM, so the user did not select a ROM on purpose, and we can exit */
 
   if (load_rom_file(romFile) == false)
     cleanup_and_exit(EXIT_FAILURE);
@@ -146,11 +152,14 @@ int run_main(int argc, char **argv){
 
     switch(gbInitErr){
       case GB_INIT_CARTRIDGE_UNSUPPORTED:
-        puts("Cartdrige unsupported!"); goto exit_cleanup;
+        puts("Cartdrige unsupported!"); 
+        cleanup_and_exit(EXIT_FAILURE);
       case GB_INIT_INVALID_CHECKSUM:
-        puts("Cartdrige checksum fail!"); goto exit_cleanup;
+        puts("Cartdrige checksum fail!");
+        cleanup_and_exit(EXIT_FAILURE);
       default:
-        puts("Unkown error!"); goto exit_cleanup;
+        puts("Unkown error!");
+        cleanup_and_exit(EXIT_FAILURE);
     }    
   }
 
@@ -164,7 +173,7 @@ int run_main(int argc, char **argv){
     puts("could not get local time!");
 
   if(initalize_cart_ram(&gameboy, romFile) == false)  
-    goto exit_cleanup;
+    cleanup_and_exit(EXIT_FAILURE);
 
   gameboy.direct.joypad = 0xFF;
 
@@ -184,14 +193,16 @@ int run_main(int argc, char **argv){
     }
   }
 
-exit_cleanup:
-  cleanup_drm();
   cleanup_and_exit(EXIT_SUCCESS);
 }
 
 
 
 void cleanup_and_exit(int exitCode){
+
+  stop = 1;
+
+  cleanup_drm();
 
   if (roms != NULL){
     free(roms); roms = NULL; romsSize = 0;

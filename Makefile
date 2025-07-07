@@ -16,6 +16,8 @@ LVGL_SRCFILES := $(ASRCS) $(CSRCS)
 LVGL_OBJFILES := $(patsubst $(CURR_DIR)/%.c,obj/%.o,$(filter %.c,$(CSRCS))) \
                  $(patsubst $(CURR_DIR)/%.S,obj/%.o,$(filter %.S,$(ASRCS)))
 
+LVGL_OBJFILES += lvgl/src/font/lv_font_montserrat_10.o
+
 all: $(TARGET)
 
 $(TARGET): $(OBJDIR)tests.o $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJDIR)util.o $(OBJDIR)lcd.o  $(OBJDIR)drm.o $(OBJDIR)input.o $(OBJDIR)blockmnt.o $(INICODE) $(LVGL_OBJFILES)
@@ -39,7 +41,7 @@ $(OBJDIR)drm.o: drm.c peanut.h
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) $(LIBDRM) 
 
-$(OBJDIR)main.o: main.c westonkill.c peanut_gb.h main.h
+$(OBJDIR)main.o: main.c westonkill.c peanut_gb.h main.h lvgl.c
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
 

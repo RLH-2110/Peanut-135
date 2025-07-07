@@ -21,6 +21,7 @@
 
 volatile sig_atomic_t stop = 0; /* programms runs as long as this is unset */
 
+bool pollDrmThreadStarted = false;
 pthread_t pollDrmThread;
 static void *poll_drm_thread(void *data);
 
@@ -97,8 +98,9 @@ void flush_cb(lv_display_t * display, const lv_area_t * area, uint8_t * px_map)
 }
 
 uint8_t line = 0;
-void draw_drm_line(uint16_t pixels[LCD_WIDTH])
-{
+
+
+void display_mode_default_func(uint16_t pixels[LCD_WIDTH]){
 
   while(waitForFlip)
     ;
@@ -112,6 +114,41 @@ void draw_drm_line(uint16_t pixels[LCD_WIDTH])
   memcpy( dest , buff8, area_width);
 
   line++;
+
+}
+
+void display_mode_wide_func(uint16_t pixels[LCD_WIDTH]){
+
+  while(waitForFlip)
+    ;
+  
+  uint8_t * buff8 = (uint8_t*) pixels; /* 16 bit (RGB565) */
+  int32_t area_width = LCD_WIDTH * 2 * BYTES_PER_PIXEL;
+  int32_t x = (H_RES - LCD_WIDTH*2) / 2; /* try to center the output */
+  int32_t y = (V_RES - LCD_HEIGHT) / 2 + line; /* try to center the output*/
+
+  uint8_t *dest = back_fb_data + (fb0.pitch * y) + (x * BYTES_PER_PIXEL);
+  //memcpy( dest , buff8, area_width);
+  for (int x = 0; x < area_width;x += 2){
+    dest[x]   = buff8[x / 2];
+    dest[x+1] = buff8[x / 2]; 
+  }
+
+  line++;
+
+}
+
+void draw_drm_line(uint16_t pixels[LCD_WIDTH])
+{
+  switch (displayMode){
+    default:
+    case 0:
+      display_mode_default_func(pixels);
+      break;
+    case 1:
+      display_mode_wide_func(pixels);
+      break;
+  }
 }
 
 void display_frame(){
@@ -130,6 +167,15 @@ void display_frame(){
   line = 0;
 }
 
+void clear_screen(){
+
+    while (waitForFlip != 0)
+      ;
+
+    memset(back_fb_data, 0x00, V_RES * fb0.pitch);
+    memset(front_fb_data, 0x00, V_RES * fb0.pitch); /* screen tearing be dammed, we are gonna clear the screen */
+
+}
 
 /* false = failed | true = success */
 bool setup_drm(void){
@@ -299,6 +345,7 @@ bool setup_drm(void){
       cleanup_drm();
       return false; 
     }
+    pollDrmThreadStarted = true;
 
   /* done, now clean and return */
 
@@ -333,8 +380,11 @@ drm_resources_cleanup:
 void cleanup_drm(void){
 
   /* polling */
-  pthread_join(pollDrmThread,NULL);
-  LOGR("THEAD END: POLLDRM",-1);
+  if (pollDrmThreadStarted){
+    pthread_join(pollDrmThread,NULL);
+    LOGR("THEAD END: POLLDRM",-1);
+    pollDrmThreadStarted = false;
+  }
 
   /* fb0 */
 
