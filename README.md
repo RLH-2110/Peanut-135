@@ -1,6 +1,7 @@
 # Peanut-135
 
-Peanut-135 is a Game Boy Emulator for the STM32MPU135F-DK, based on [Peanut-GB](https://github.com/deltabeard/Peanut-GB) by [deltabeard](https://github.com/deltabeard)
+Peanut-135 is a Game Boy Emulator for the STM32MPU135F-DK, based on [Peanut-GB](https://github.com/deltabeard/Peanut-GB) by [deltabeard](https://github.com/deltabeard)  
+It is assumed that this Program runs on **OpenSTLinux**.
 
 # Installation
 
@@ -8,6 +9,12 @@ This is meant to work with Yocto, The next push will include a .bb file that you
 Then just add the package to your image. Read the Yocto or Bitbake documentation if you need help.
 
 If you make an own Recipe, then don't forget to pass `all` to the Makefile, I remember having issues when not doing so.
+
+# Exiting the Emulator
+
+Currently, the only way to Exit the Emulator is to abort it with `CTRL-C`.
+> [!Warning]
+> Opening this program with a Weston terminal will result in Weston and the Program being terminated. You may currently only launch this programm via a Serial Connection or SSH
 
 # Controls
 
@@ -54,6 +61,12 @@ Dependencies (stored in .gitmodules):
   
 3rd Party code (directly integrated):
 [DRM Doc](https://github.com/ascent12/drm_doc)
+
+# FAQ
+
+### Q: After I exited the Emulator, Weston did not restart.
+
+A: restart the emulator and close it again, or try to run `mkdir -p $XDG_RUNTIME_DIR`and  `weston &` It seems to be rare that it fails to restart, but trying it again seems to fix it.
 
 # Footnotes
 
