@@ -10,7 +10,7 @@ extern size_t romsSize;
 #define MAX_PARTITIONS 9
 
 /* finds roms, and creates a list of them into `roms` and upadtes `romsCount`*/
-bool search_roms(char* customSearchPath);
+bool search_roms(char* customSearchPath, bool searchExternal, bool searchHome);
 
 typedef struct mount_list{
   char *device;

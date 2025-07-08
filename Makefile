@@ -16,8 +16,6 @@ LVGL_SRCFILES := $(ASRCS) $(CSRCS)
 LVGL_OBJFILES := $(patsubst $(CURR_DIR)/%.c,obj/%.o,$(filter %.c,$(CSRCS))) \
                  $(patsubst $(CURR_DIR)/%.S,obj/%.o,$(filter %.S,$(ASRCS)))
 
-LVGL_OBJFILES += lvgl/src/font/lv_font_montserrat_10.o
-
 all: $(TARGET)
 
 $(TARGET): $(OBJDIR)tests.o $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJDIR)util.o $(OBJDIR)lcd.o  $(OBJDIR)drm.o $(OBJDIR)input.o $(OBJDIR)blockmnt.o $(INICODE) $(LVGL_OBJFILES)
@@ -37,7 +35,7 @@ $(TARGET): $(OBJDIR)tests.o $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJD
 	$(info    $(LIBDRM))
 	$(info    #############################################################################)
 	
-$(OBJDIR)drm.o: drm.c peanut.h drm_draw.c
+$(OBJDIR)drm.o: drm.c peanut.h drm_draw.c main.h
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) $(LIBDRM) 
 
@@ -45,7 +43,7 @@ $(OBJDIR)main.o: main.c westonkill.c peanut_gb.h main.h lvgl.c
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
 
-$(OBJDIR)input.o: input.c touch_regions.c finger.c peanut.h
+$(OBJDIR)input.o: input.c touch_regions.c finger.c peanut.h main.h
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) 
 
@@ -56,12 +54,12 @@ $(OBJDIR)tests.o: forktest/tests.c peanut.h forktest/test_* main.h
 
 
 
-$(OBJDIR)%.o: %.c peanut.h forktest/test_*
+$(OBJDIR)%.o: %.c peanut.h forktest/test_* main.h lv_conf.h
 	#mkdir -p $(OBJDIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
 
-$(OBJDIR)%.o: %.S 
+$(OBJDIR)%.o: %.S lv_conf.h
 	#mkdir -p $(OBJDIR) 
 	mkdir -p $(dir $@)
 	$(CC) $(AFLAGS) -c $< -o $@ $(LDFLAGS)

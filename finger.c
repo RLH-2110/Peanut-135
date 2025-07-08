@@ -37,7 +37,9 @@ void get_inital_finger_data(void){
   /* Get current slot */
   if (ioctl(touchFd, EVIOCGABS(ABS_MT_SLOT), &absInfo) == 0) {
     activeFingerOsSlot = absInfo.value;
+#if DEBUG_INPUTS
     printf("Initial OS slot: %d\n", activeFingerOsSlot);
+#endif
   } else {
     perror("Error: Could not get initial OS slot");
     activeFingerOsSlot = 0; /* Default to slot 0 */
@@ -46,7 +48,9 @@ void get_inital_finger_data(void){
   /* Get current x */
   if (ioctl(touchFd, EVIOCGABS(ABS_X), &absInfo) == 0) {
     lastX = absInfo.value;
+#if DEBUG_INPUTS
     printf("Initial X: %d\n", lastX);
+#endif
   } else {
     perror("Error: Could not get initial X");
     lastX = 0; /* fallback */
@@ -56,7 +60,9 @@ void get_inital_finger_data(void){
   /* Get current y */
   if (ioctl(touchFd, EVIOCGABS(ABS_Y), &absInfo) == 0) {
     lastY = absInfo.value;
+#if DEBUG_INPUTS
     printf("Initial Y: %d\n", lastY);
+#endif
   } else {
     perror("Error: Could not get initial Y");
     lastY = 0; /* fallback */

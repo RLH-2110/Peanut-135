@@ -66,6 +66,12 @@ void scan_path(char* path, char* heapBuffer, size_t *heapBuffSize, size_t *heapB
   DIR *dir = opendir(path);
   if (dir == NULL){
     printf("could not open directory %s\n",path);
+    
+    char* debtest = path;
+    while (*debtest != '\0')
+      printf("%X ",*debtest);
+    printf("%X\n",0);
+
     return;
   }
   LOGR("Open: Directory",1);
@@ -127,7 +133,7 @@ void scan_path(char* path, char* heapBuffer, size_t *heapBuffSize, size_t *heapB
 /* -------------------------------------------------------------- */
 
 /* finds roms, and creates a list of them into `roms` and upadtes `romsSize` and `romsIndex` */
-bool search_roms(char* customSearchPath){
+bool search_roms(char* customSearchPath, bool searchExternal, bool searchHome){
 
   romsSize = 0xFF;
   romsIndex = 0;
@@ -146,28 +152,32 @@ bool search_roms(char* customSearchPath){
 
 
   /* scan custom path*/
-  if (customSearchPath != NULL){
+  if (customSearchPath != NULL && customSearchPath[0] != '\0'){
     scan_path(customSearchPath,roms,&romsSize, &romsIndex, true,true,true);
   }  
 
   /* scan mounted stuff */
+  if (searchExternal){
+    mount_list_t *mountedSCSI = get_mounted_partitions();
+    mount_list_t *current = mountedSCSI;
 
-  mount_list_t *mountedSCSI = get_mounted_partitions();
-  mount_list_t *current = mountedSCSI;
-
-  while(current != NULL){
-    scan_path(current->mountPoint,roms,&romsSize, &romsIndex, true, true,true);
-    current = current->next;
+    while(current != NULL){
+      scan_path(current->mountPoint,roms,&romsSize, &romsIndex, true, true,true);
+      current = current->next;
+    }
+    free_mount_list(mountedSCSI);
   }
-  free_mount_list(mountedSCSI);
 
   /* scan home */
-  char *home = getenv("HOME");
-  if (home == NULL)
-    puts("Warning: Can't find home directory!");
-  else
-    scan_path(home,roms,&romsSize, &romsIndex, true, true, true);
+  if (searchHome){
+    char *home = getenv("HOME");
+    if (home == NULL)
+      puts("Warning: Can't find home directory!");
+    else
+      scan_path(home,roms,&romsSize, &romsIndex, true, true, true);
+  }
 
+#if DEBUG_BLOCKMNT
   printf("--\nromsIndex: %d\nromsSize: %d\nroms:\n",romsIndex,romsSize);
   for (int i = 0; i < romsIndex; i++){
     if (roms[i] == '\0')
@@ -176,6 +186,7 @@ bool search_roms(char* customSearchPath){
       putchar(roms[i]);
   }
   puts("--");
+#endif
 
   return true;
 }
@@ -247,7 +258,9 @@ bool find_and_mount(void){
 
   mount_list_t *alreadyMounted = get_mounted_partitions();
 
+#if DEBUG_BLOCKMNT
   puts("finished getting the mount list");
+#endif
 
   /* find all external partitions */
   for (;*deviceLetter <= 'z';(*deviceLetter)++){
@@ -396,7 +409,9 @@ mount_list_t* get_mounted_partitions(void){
 
     if (fgets(buff, GMP_BUFF_SIZE, fd) == NULL){
       buff[0] = '\0';
+#if DEBUG_BLOCKMNT
       printf("Info: fgets read returned NULL!\n\tread %d entries\n",entriesRead);
+#endif
       break;
     }
     entriesRead++;

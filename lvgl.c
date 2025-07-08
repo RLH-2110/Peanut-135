@@ -108,6 +108,7 @@ bool lvgl_main(void){
   lv_obj_t *sidePanel = lv_obj_create(screen);
   lv_obj_t *sidePanelRootBtn = lv_btn_create(sidePanel);
   sidePanelRootLbl = lv_label_create(sidePanelRootBtn);
+  lv_obj_center(sidePanelRootLbl);
   lv_obj_t *sidePanelHomeBtn = NULL;
   sidePanelHomeLbl = NULL;
   if (home != NULL){
@@ -173,6 +174,7 @@ bool lvgl_main(void){
   lv_obj_set_height(mainPanel, LV_PCT(100));
   lv_obj_set_flex_flow(mainPanel, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_grow(mainPanel, 1);
+  lv_obj_set_scroll_dir(mainPanel, LV_DIR_NONE);
 
 
     lv_obj_t *pathBox = lv_obj_create(mainPanel);
@@ -180,14 +182,14 @@ bool lvgl_main(void){
     lv_obj_set_flex_flow(pathBox, LV_FLEX_FLOW_ROW);
     lv_obj_t *pathExplainLbl = lv_label_create(pathBox);
     lv_label_set_text(pathExplainLbl,"Path: ");
-    pathLabel = lv_label_create(pathBox); //lv_textarea_create(pathBox);
+    pathLabel = lv_label_create(pathBox); 
     lv_label_set_text(pathLabel, "/");
     lv_obj_set_height(pathBox, LV_SIZE_CONTENT);
 
 
 
     fileList = lv_list_create(mainPanel);
-    lv_obj_set_height(fileList, 80); 
+    lv_obj_set_height(fileList, 150); 
     lv_obj_set_width(fileList, LV_PCT(100));
     lv_obj_set_scroll_dir(fileList, LV_DIR_VER);
 
@@ -202,19 +204,27 @@ bool lvgl_main(void){
       lv_obj_set_width(fileRow, LV_PCT(100));
       lv_obj_set_flex_flow(fileRow, LV_FLEX_FLOW_ROW);
       lv_obj_set_height(fileRow, LV_SIZE_CONTENT);
-            
+      lv_obj_set_flex_align(fileRow,LV_FLEX_ALIGN_START,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_START);
+
         lv_obj_t *fileLabel = lv_label_create(fileRow);
         lv_label_set_text(fileLabel, "file:");
 
-        fileNameBox = lv_textarea_create(fileRow);
-        lv_obj_set_height(fileNameBox, LV_SIZE_CONTENT);
-        lv_obj_set_flex_grow(fileNameBox, 1); /* Take remaining space */
+        lv_obj_t *fileNameFakeBox = lv_obj_create(fileRow);
+        lv_obj_set_width(fileNameFakeBox, LV_PCT(100));
+        lv_obj_set_height(fileNameFakeBox, LV_SIZE_CONTENT);
+        lv_obj_set_style_pad_all(fileNameFakeBox,2,0);
+        lv_obj_set_flex_grow(fileNameFakeBox, 1); /* Take remaining space */
+
+          fileNameBox = lv_label_create(fileNameFakeBox);
+          lv_obj_set_height(fileNameBox, LV_SIZE_CONTENT);
+          lv_label_set_text(fileNameBox, "");
 
 
       lv_obj_t *buttonRow = lv_obj_create(bottomRow);
       lv_obj_set_width(buttonRow, LV_PCT(100));
       lv_obj_set_flex_flow(buttonRow, LV_FLEX_FLOW_ROW);
       lv_obj_set_height(buttonRow, LV_SIZE_CONTENT);
+      lv_obj_set_flex_align(buttonRow,LV_FLEX_ALIGN_START,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_START);
 
         okBtn = lv_btn_create(buttonRow);
         lv_obj_t *okLabel = lv_label_create(okBtn);
@@ -225,10 +235,11 @@ bool lvgl_main(void){
         lv_obj_t *exitLabel = lv_label_create(exitBtn);
         lv_label_set_text(exitLabel, "Exit");
         lv_obj_add_event_cb(exitBtn, lvgl_ok_exit_clicked_cb,LV_EVENT_CLICKED,NULL);
-
+        
         showAllFilesCheckbox = lv_checkbox_create(buttonRow);
         lv_checkbox_set_text(showAllFilesCheckbox, "Show all files");
         lv_obj_add_event_cb(showAllFilesCheckbox, lvgl_checkbox_toggle_cb, LV_EVENT_VALUE_CHANGED, NULL);
+
 
       lv_obj_set_height(bottomRow, LV_SIZE_CONTENT);
 
@@ -236,10 +247,10 @@ bool lvgl_main(void){
   lv_obj_set_style_border_width(fileRow, 0, 0);
   lv_obj_set_style_border_width(buttonRow, 0, 0);
 
-  lv_obj_set_style_pad_all(mainPanel, 0, 1);
-  lv_obj_set_style_pad_all(fileList, 0, 1);
-  lv_obj_set_style_pad_all(pathBox, 0, 1);
-  lv_obj_set_style_pad_all(bottomRow, 0, 1);
+  lv_obj_set_style_pad_all(mainPanel, 2, 0);
+  lv_obj_set_style_pad_all(fileList, 2, 0);
+  lv_obj_set_style_pad_all(pathBox, 2, 0);
+  lv_obj_set_style_pad_all(bottomRow, 2, 0);
   lv_obj_set_style_pad_all(fileRow, 0, 0);
   lv_obj_set_style_pad_all(buttonRow, 0, 0);
 
@@ -392,7 +403,7 @@ void lvgl_printme_cb(lv_event_t *e){
   }
   strcpy(staticBuff, lv_label_get_text(label));
 
-  lv_textarea_set_text(fileNameBox, staticBuff);
+  lv_label_set_text(fileNameBox, staticBuff);
 }
 /* --------------------------------- */
 void lvgl_change_dir_cb(lv_event_t *e){
@@ -476,15 +487,13 @@ void lvgl_ok_exit_clicked_cb(lv_event_t *e){
 
     /* construct absolute path */
     static char constructedPath[LV_FS_MAX_PATH_LENGTH+1] = {0};
-    path_construct(constructedPath,LV_FS_MAX_PATH_LENGTH+1,lv_label_get_text(pathLabel),lv_textarea_get_text(fileNameBox));
-/*
-    if (sizeof(constructedPath) - 1 >= strlen(lv_textarea_get_text(fileNameBox))){
-      strcpy(constructedPath,lv_textarea_get_text(fileNameBox));
-      if (sizeof(constructedPath) - 1 - strlen(constructedPath) >= strlen(lv_label_get_text(pathLabel)))
-        strcpy(constructedPath+strlen(constructedPath),lv_label_get_text(pathLabel));
-    }*/
+    path_construct(constructedPath,LV_FS_MAX_PATH_LENGTH+1,lv_label_get_text(pathLabel),lv_label_get_text(fileNameBox));
     printf("Debug: constucted Path: %s\n",constructedPath);
+
     romFile = constructedPath; 
+    
+    if (lv_label_get_text(fileNameBox)[0] == '\0')
+      romFile = NULL;
 
   }else if (button == exitBtn){
 
@@ -493,18 +502,6 @@ void lvgl_ok_exit_clicked_cb(lv_event_t *e){
   }else{
     puts("Error: Invalid exit button!");
     romFile = NULL;
-  }
-
-  if (romFile != NULL){
-
-    /* strip leading spaces */
-    while(isspace(*romFile)) romFile++;
-
-    /*trim trailing space*/
-    char* end = (char*)(romFile + strlen(romFile) - 1);
-    while(end > romFile && isspace(*end)) end--;
-    end[1] = '\0';
-    
   }
 
   lvDone = 1;

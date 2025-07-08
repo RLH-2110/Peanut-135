@@ -2,7 +2,7 @@
 #define INCLUDED_MAIN_H
 
 #define RLH_TEST 0
-#define LOG_RESOURCES 1
+#define LOG_RESOURCES 0
 extern int resource_count;
 
 #if LOG_RESOURCES

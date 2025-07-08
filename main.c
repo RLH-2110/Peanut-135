@@ -97,7 +97,7 @@ int run_main(int argc, char **argv){
   signal(SIGTERM,on_termination);
   
   load_conf(false);
-  if( search_roms(customSearchPath) == false)
+  if( search_roms(customSearchPath,searchExternal,searchHome) == false)
     cleanup_and_exit(EXIT_FAILURE);
 
   if (kill_weston() == false)
@@ -106,8 +106,6 @@ int run_main(int argc, char **argv){
   if (setup_drm() == false)
     cleanup_and_exit(EXIT_FAILURE);
 
-
-printf("\n\nROM count: %d\n",get_roms_count());
 
   /* get rom from either arguments, autoLoad or lvgl */
   if (argc >= 2) {
@@ -123,10 +121,9 @@ printf("\n\nROM count: %d\n",get_roms_count());
     }
   }
 
-  printf("reached main! romFile: %s\n",romFile);
+  printf("Selected rom file: %s\n",romFile);
 
   clear_screen();
-  puts("cleared screen");
 
   if (romFile == NULL || *romFile == '\0')
     cleanup_and_exit(EXIT_SUCCESS); /* this can only happen if the user exited lvgl without selecting a ROM, so the user did not select a ROM on purpose, and we can exit */
@@ -206,6 +203,7 @@ void cleanup_and_exit(int exitCode){
 
   if (roms != NULL){
     free(roms); roms = NULL; romsSize = 0;
+    LOGR("Clean: ROMS",-1);
   }
 
   if (romData != NULL){

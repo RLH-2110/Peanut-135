@@ -130,6 +130,11 @@ bool load_rom_file(const char * const path){
         perror("Memory map failed! mmap errno");
     }
 
+    if (close(fd) != 0)
+      perror("Error: close error after mmaping memory! close errno");
+    else
+      LOGR("CLEAN: ROMFILE",-1);
+
     return false;
   }
 
