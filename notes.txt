@@ -1,3 +1,5 @@
 regex to find only LOGR output by replacing all other lines with nothing:
   ^(?!.*RESOURCES).*$
 
+
+we might have a bug of missing 1 row of pixels in full_y mode

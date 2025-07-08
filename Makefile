@@ -37,7 +37,7 @@ $(TARGET): $(OBJDIR)tests.o $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJD
 	$(info    $(LIBDRM))
 	$(info    #############################################################################)
 	
-$(OBJDIR)drm.o: drm.c peanut.h
+$(OBJDIR)drm.o: drm.c peanut.h drm_draw.c
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) $(LIBDRM) 
 
