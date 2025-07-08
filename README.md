@@ -56,6 +56,9 @@ There are also multiple display settings:
 
 # Dependencies and 3rd party
 
+Dependencies (stored on the local machine)  
+libdrm, util-linux
+
 Dependencies (stored in .gitmodules):  
 [iniparser](https://gitlab.com/iniparser/iniparser.git)  
   
