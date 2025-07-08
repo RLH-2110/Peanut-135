@@ -10,9 +10,10 @@ typedef struct touch_info{
   bool released;
   touchr_t region; /* which button region the finger is in*/
   touchr_t region_previous;
+  bool initial_x; /* if set to true, then the next x update will also update region_previous */
+  bool initial_y;
 
 } touch_info_t;
-
 
 #define SUPPORTED_FINGERS 3 /* values above 3 can lead to weird behavior when fingers get too close! */
 touch_info_t fingers[SUPPORTED_FINGERS] = {0};
@@ -23,6 +24,12 @@ int activeFingerOsSlot;
 int lastX;
 int lastY;
 
+
+#ifdef DEBUG_INPUTS
+void print_finger(touch_info_t *finger);
+#endif
+
+
 /* gets current os slot, and x,y */
 void get_inital_finger_data(void){
   struct input_absinfo absInfo;
@@ -30,7 +37,9 @@ void get_inital_finger_data(void){
   /* Get current slot */
   if (ioctl(touchFd, EVIOCGABS(ABS_MT_SLOT), &absInfo) == 0) {
     activeFingerOsSlot = absInfo.value;
+#if DEBUG_INPUTS
     printf("Initial OS slot: %d\n", activeFingerOsSlot);
+#endif
   } else {
     perror("Error: Could not get initial OS slot");
     activeFingerOsSlot = 0; /* Default to slot 0 */
@@ -39,7 +48,9 @@ void get_inital_finger_data(void){
   /* Get current x */
   if (ioctl(touchFd, EVIOCGABS(ABS_X), &absInfo) == 0) {
     lastX = absInfo.value;
+#if DEBUG_INPUTS
     printf("Initial X: %d\n", lastX);
+#endif
   } else {
     perror("Error: Could not get initial X");
     lastX = 0; /* fallback */
@@ -49,7 +60,9 @@ void get_inital_finger_data(void){
   /* Get current y */
   if (ioctl(touchFd, EVIOCGABS(ABS_Y), &absInfo) == 0) {
     lastY = absInfo.value;
+#if DEBUG_INPUTS
     printf("Initial Y: %d\n", lastY);
+#endif
   } else {
     perror("Error: Could not get initial Y");
     lastY = 0; /* fallback */
@@ -114,9 +127,20 @@ bool init_finger(int fingerId, int osSlot){
   finger->released = false;
   finger->region = get_touch_region(lastX, lastY);
   finger->region_previous = finger->region;
+  finger->initial_x = true;
+  finger->initial_y = true;
+
 
   activeFingerId = fingerId;
   activeFingerArrId = slot;
+
+#if DEBUG_INPUTS >= 4
+
+  puts("inital finger config:");
+  print_finger(finger);
+  puts("---");
+
+#endif
 
   return true;
 }
@@ -183,6 +207,19 @@ void update_finger(touch_info_t *finger, uint_fast16_t x, uint_fast16_t y){
     finger->y = y;
 
   finger->region = get_touch_region(finger->x, finger->y);
+
+  if (finger->initial_x && x != -1){
+    finger->initial_x = false;
+    finger->region_previous = finger->region;
+  }
+  if (finger->initial_y && y != -1){
+    finger->initial_y = false;
+    finger->region_previous = finger->region;
+  }
+
+#if DEBUG_INPUTS >= 4
+  printf("finger %d got updated!\n\tRegion : %s\n\tRegionP: %s\n",finger->fingerId,touch_region_to_string(finger->region),touch_region_to_string(finger->region_previous));
+#endif
 }
 
 

@@ -1,9 +1,9 @@
 #ifndef INCLUDED_MAIN_H
 #define INCLUDED_MAIN_H
 
-#define LOG_RESOURCES 1
+#define RLH_TEST 0
+#define LOG_RESOURCES 0
 extern int resource_count;
-
 
 #if LOG_RESOURCES
 #   define LOGR(msg, inc) {\

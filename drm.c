@@ -21,6 +21,7 @@
 
 volatile sig_atomic_t stop = 0; /* programms runs as long as this is unset */
 
+bool pollDrmThreadStarted = false;
 pthread_t pollDrmThread;
 static void *poll_drm_thread(void *data);
 
@@ -61,61 +62,9 @@ static void page_flip_handler(int drm_fd, unsigned sequence, unsigned tv_sec,	un
   waitForFlip = 0;
 }
 
-uint8_t line = 0;
-void draw_drm_line(uint16_t pixels[LCD_WIDTH])
-{
+/* all the drawing functions */
+#include "drm_draw.c"
 
-#if DROP_FRAMES
-  if (waitForFlip != 0)
-  {
-#if LOG_DROPPED_FRAMES
-    //printf("dropped frame at %d\n",time(NULL));
-    printf("dropped frame %d\n",frameCount);
-#endif
-    return;
-  }
-#else
-  while(waitForFlip)
-    ;
-#endif
-  
-  uint8_t * buff8 = (uint8_t*) pixels; /* 16 bit (RGB565) */
-  int32_t area_width = LCD_WIDTH * BYTES_PER_PIXEL;
-  int32_t x = (H_RES - LCD_WIDTH) / 2; /* try to center the output */
-  int32_t y = (V_RES - LCD_HEIGHT) / 2 + line; /* try to center the output*/
-
-  uint8_t *dest = back_fb_data + (fb0.pitch * y) + (x * BYTES_PER_PIXEL);
-  memcpy( dest , buff8, area_width);
-
-  line++;
-}
-
-void display_frame(){
-
-#if DROP_FRAMES
-  if (waitForFlip != 0)
-  {
-#if LOG_DROPPED_FRAMES
-    //printf("dropped frame at %d\n",time(NULL));
-    printf("dropped frame %d\n",frameCount);
-#endif
-    return;
-  }
-#else
-  while(waitForFlip)
-    ;
-#endif
-
-  frameCount++;
-  waitForFlip = 1;
-
-  if (drmModePageFlip(  drm_fd, crtc, back_fb, DRM_MODE_PAGE_FLIP_EVENT, NULL) != 0){
-    perror("PageFLip in draw_drm_line");
-    waitForFlip = 0;
-  }
-
-  line = 0;
-}
 
 /* false = failed | true = success */
 bool setup_drm(void){
@@ -285,6 +234,7 @@ bool setup_drm(void){
       cleanup_drm();
       return false; 
     }
+    pollDrmThreadStarted = true;
 
   /* done, now clean and return */
 
@@ -319,8 +269,11 @@ drm_resources_cleanup:
 void cleanup_drm(void){
 
   /* polling */
-  pthread_join(pollDrmThread,NULL);
-  LOGR("THEAD END: POLLDRM",-1);
+  if (pollDrmThreadStarted){
+    pthread_join(pollDrmThread,NULL);
+    LOGR("THEAD END: POLLDRM",-1);
+    pollDrmThreadStarted = false;
+  }
 
   /* fb0 */
 

@@ -10,14 +10,25 @@
 #include <string.h>
 
 #include "ram.h"
+#include "forktest/test_ram.h"
 #include "peanut.h"
 #include "util.h"
 #include "main.h"
 
-#define SAVE_FILE_MAX_LENGTH 50 
-#define SAVE_LOCATION_FROM_HOME "/gbsaves/"
+#define SAVE_FILE_MAX_LENGTH 100 
 #define SAVE_FILE_EXTENSION ".sav"
-#define SAVE_FILE_USABLE_LENGH SAVE_FILE_MAX_LENGTH - strlen(SAVE_FILE_EXTENSION) - strlen(SAVE_LOCATION_FROM_HOME) - strlen(homeDir) - 1
+#define SAVE_FILE_USABLE_LENGH SAVE_FILE_MAX_LENGTH - strlen(SAVE_FILE_EXTENSION) - 1
+
+char saveFileName[SAVE_FILE_MAX_LENGTH]; 
+
+#define FS_RETIES 500 /* determins how often we try again if a read or write writes less bytes than required */
+
+/* for tests */
+bool testCartridgeRamOverwriteOn = false;
+int testCartridgeRamOverwrite = 0;
+bool testNeverLoadFromFileOverwrite = false;
+
+
 
 /*writes a byte to the RAM at the given address
   gb: unused
@@ -46,9 +57,51 @@ uint8_t gb_cart_ram_read(struct gb_s* gameboy, const uint_fast32_t addr){
   return cartRamData[addr];
 }
 
+char* get_save_name(const char *const romName){
+  
+  char* fullPath = realpath(romName,NULL);
+  LOGR("Alloc: fullPath",1);
+  if (fullPath == NULL){
+    perror("Error: Could not get path of ROM. Errno");
+    return NULL;
+  }
+
+  size_t romNameLen = strlen(fullPath);
+  size_t fileExtOffset = romNameLen;
+
+  size_t copyLength = romNameLen;
+  
+  /* find last . */
+  for (size_t i = romNameLen - 1; i > 0;i--){
+    if (fullPath[i] == '.'){
+      fileExtOffset = i;
+      break;    
+    }
+  }
+
+  /* exlude text after last . */
+  if (copyLength > fileExtOffset)
+    copyLength = fileExtOffset;
+
+  /* bounds check */
+  if (copyLength > SAVE_FILE_USABLE_LENGH){
+    puts("Error: File Path too long!");
+    free(fullPath); fullPath == NULL;
+    LOGR("Clean: fullPath",-1);
+    return NULL;   
+  }
+
+  memcpy(saveFileName               ,fullPath             ,copyLength);                       /* copy file name */
+  memcpy(saveFileName+copyLength    ,SAVE_FILE_EXTENSION  ,strlen(SAVE_FILE_EXTENSION) + 1);  /* add SAVE_FILE_EXTENSION and \0 */
+
+  free(fullPath); fullPath == NULL;
+  LOGR("Clean: fullPath",-1);
+  return saveFileName;
+}
+
 /* loads ram file, if one exist, otherwhise loads Cartride ram with 0. returns true on success, false on error
   uses global state: cartRamData, cartRamSize
-  romName: name of the ROM file (without the path)
+  romName: path to the ROM file
   cartRamData, will get set to a pointer to the allocated memory for the RAM (set to NULL if function is unsuccesfull)
   cartRamSize, will get set to the size of the RAM.
 
@@ -59,41 +112,43 @@ bool initalize_cart_ram(struct gb_s *gameboy, const char *const romName){
   /*initalize in case of early return*/
   cartRamData = NULL;
 
-  cartRamSize = gb_get_save_size(gameboy);
+  if (testCartridgeRamOverwriteOn == false){
+    if (gameboy == NULL){
+      puts("Error: gameboy can not be NULL in initalize_cart_ram");
+      return false;
+    }
+
+    if (gb_get_save_size_s(gameboy, &cartRamSize) != 0){
+      puts("Error: could not get cartridge ram size!");
+      cartRamSize = 0; 
+    }
+
+  }else
+    cartRamSize = testCartridgeRamOverwrite;
 
   if (cartRamSize == 0)
     return true; /* no cartrige ram needed */
 
-
-  if (romName == NULL)
+  if (romName == NULL){
+    puts("Error: Please provie the romName in initalize_cart_ram, to get the save file name");
     return false;
-
-  char *homeDir = getenv("HOME");
-  if (homeDir == NULL){
-    puts("Error: $HOME is not set! Savefiles can not be read!");
-    goto file_does_not_exit;
   }
 
-  
+  if (testNeverLoadFromFileOverwrite)
+    goto file_does_not_exit;
+
   if (SAVE_FILE_USABLE_LENGH <= 3){
     printf("please increase the size of SAVE_FILE_MAX_LENGTH in RAM.H!\n\t Curent useable size: %ld\n",SAVE_FILE_USABLE_LENGH);  
     puts("save file can not be read!");
     goto file_does_not_exit;
   }
 
-  char saveFileName[SAVE_FILE_MAX_LENGTH]; 
-  
-  size_t copyLength = strlen(romName);
-  if (copyLength > SAVE_FILE_USABLE_LENGH) 
-    copyLength = SAVE_FILE_USABLE_LENGH;
-    
-  strcpy(saveFileName                                                       ,homeDir);                          /* copy home directory */
-  strcpy(saveFileName+strlen(homeDir)                                       ,SAVE_LOCATION_FROM_HOME);          /* copy save folder path relative from home */
-  memcpy(saveFileName+strlen(SAVE_LOCATION_FROM_HOME) ,romName              ,copyLength);                       /* copy file name */
-  memcpy(saveFileName+copyLength                      ,SAVE_FILE_EXTENSION  ,strlen(SAVE_FILE_EXTENSION) + 1);  /* add SAVE_FILE_EXTENSION and \0 */
+  if (get_save_name(romName) == NULL){
+    printf("No save file found at %s\n",saveFileName);
+    goto file_does_not_exit;
+  }
 
-
-  bool fileExists;
+  bool fileExists = true;
   size_t saveFileSize = 0;
 
   /* check filesize, and if file exists  */
@@ -125,8 +180,6 @@ bool initalize_cart_ram(struct gb_s *gameboy, const char *const romName){
       == false)
         return false;
 
-      NOT_IMPLEMENTED return false;
-
     } 
 
     /* check if file is big */
@@ -157,12 +210,19 @@ bool initalize_cart_ram(struct gb_s *gameboy, const char *const romName){
     }
     LOGR("ALLOC: SAVEFILE",1);
 
-    int readSize;
+    size_t readSize = 0; 
+    size_t maxRead;
+    int tries = FS_RETIES;
 
     if (saveFileSize <= cartRamSize)
-      readSize = read(saveFile,cartRamData,saveFileSize);   
+      maxRead = saveFileSize; 
     else
-      readSize = read(saveFile,cartRamData,cartRamSize);
+      maxRead = cartRamSize; 
+
+    while(readSize < maxRead && tries > 0 && readSize != -1){
+      readSize += read(saveFile,cartRamData+readSize,maxRead-readSize);
+      tries--;
+    }
 
     if (readSize < cartRamSize && readSize < saveFileSize){
       if (readSize == -1)
@@ -172,7 +232,7 @@ bool initalize_cart_ram(struct gb_s *gameboy, const char *const romName){
 
       free(cartRamData); cartRamData = NULL;
       LOGR("CLEAN: RAMDATA",-1);
-      return false;
+      goto file_does_not_exit;
     }
 
     if (cartRamSize > saveFileSize)
@@ -183,6 +243,13 @@ bool initalize_cart_ram(struct gb_s *gameboy, const char *const romName){
     else
       LOGR("CLEAN: SAVEFILE",-1);
  
+    if (readSize < cartRamSize){
+      printf("Error: could not read file!\n\tRead %d out of %d bytes!",readSize,cartRamSize);
+ 
+      free(cartRamData); cartRamData = NULL;
+      LOGR("CLEAN: RAMDATA",-1);
+      goto file_does_not_exit;
+    }
     return true;
   } 
 
@@ -195,6 +262,72 @@ file_does_not_exit:
     return false;
   }
   LOGR("ALLOC: RAMDATA",1);
+
+  return true;
+}
+
+
+
+/* --------------------------- */
+
+
+bool save_cart_ram(struct gb_s *gameboy, const char *const romName){
+
+  if (cartRamSize == 0)
+    return true; /* no cartrige ram, so no save file */
+
+  if (romName == NULL){
+    puts("Error: Please provie the romName in initalize_cart_ram, to get the save file name");
+    return false;
+  }
+
+  char *homeDir = getenv("HOME");
+  if (homeDir == NULL){
+    puts("Error: $HOME is not set! Savefiles can not be read!");
+    return false;    
+  }
+
+  
+  if (SAVE_FILE_USABLE_LENGH <= 3){
+    printf("please increase the size of SAVE_FILE_MAX_LENGTH in RAM.H!\n\t Curent useable size: %ld\n",SAVE_FILE_USABLE_LENGH);  
+    puts("save file can not be written!");
+    return false;
+  }
+
+
+  if (get_save_name(romName) == NULL)
+    return false;
+
+   
+  int saveFile = open(saveFileName,O_WRONLY | O_TRUNC | O_CREAT, 0x600 );
+  if (saveFile < 0){
+    puts("Error: Could not open save file!");
+    return false;
+  }
+  LOGR("ALLOC: SAVEFILE",1);
+
+  size_t written = 0;
+  int tries = FS_RETIES;
+  
+  while(written < cartRamSize && tries > 0 && written != -1){
+    written += write(saveFile,(uint8_t*)(cartRamData + written), cartRamSize-written);
+    tries--;
+  }
+
+  if (close(saveFile) != 0)
+    perror("Error: could not close Savefile! errno");
+  else
+    LOGR("CLEAN: SAVEFILE",-1);
+
+  if (written == -1){
+    perror("Error: Could not write file! Errno");
+    return false;
+  }
+
+  if (written < cartRamSize){
+    printf("Error: could not save file!\n\tSaved %d out of %d bytes!",written,cartRamSize);
+    return false;
+  }
 
   return true;
 }
