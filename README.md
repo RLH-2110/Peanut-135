@@ -59,7 +59,7 @@ There are also multiple display settings:
 Dependencies (stored in .gitmodules):  
 [iniparser](https://gitlab.com/iniparser/iniparser.git)  
   
-3rd Party code (directly integrated):
+3rd Party code (directly integrated):  
 [DRM Doc](https://github.com/ascent12/drm_doc)
 
 # FAQ
