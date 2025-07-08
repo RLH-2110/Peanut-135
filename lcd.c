@@ -1,10 +1,10 @@
 #include<stdint.h>
 
 
-#include "lcd.h"
-#include "peanut.h"
-#include "util.h"
-#include "drm.h"
+#include "headers/lcd.h"
+#include "headers/peanut.h"
+#include "headers/util.h"
+#include "headers/drm.h"
 
 uint16_t SHADES565_GRAY[4] = { 0xffff, 0xad75, 0x6b4d , 0x0000 };
 uint16_t SHADES565_DARK_GREEN[4] = { 0xffff, 0x7c02, 0x5bc8 , 0x0000 };

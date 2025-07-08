@@ -8,11 +8,11 @@
 #include <signal.h>
 #include <poll.h>
 
-#include "input.h"
-#include "peanut.h"
-#include "drm.h" /* defines volitile sig_atomic_t stop */
-#include "main.h"
-#include "button_map.h"
+#include "headers/input.h"
+#include "headers/peanut.h"
+#include "headers/drm.h" /* defines volitile sig_atomic_t stop */
+#include "headers/main.h"
+#include "headers/button_map.h"
 
 #define DEBUG_INPUTS 0
 

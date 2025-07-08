@@ -14,10 +14,10 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#include "lcd.h"
-#include "drm.h"
-#include "blockmnt.h"
-#include "util.h"
+#include "headers/lcd.h"
+#include "headers/drm.h"
+#include "headers/blockmnt.h"
+#include "headers/util.h"
 
 #define LVGL_DESIRED_TICK_INCREASE_MS 1
 #define MICROSECOND_TO_MILISECOND_RATE 1000

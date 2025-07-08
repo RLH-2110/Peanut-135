@@ -12,9 +12,9 @@
 #include <dirent.h>
 
 
-#include "main.h"
-#include "util.h"
-#include "blockmnt.h"
+#include "headers/main.h"
+#include "headers/util.h"
+#include "headers/blockmnt.h"
 
 #define DEBUG_BLOCKMNT 0
 

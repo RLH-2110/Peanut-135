@@ -9,10 +9,10 @@
 #include <fcntl.h>
 #include <stdint.h>
 
-#include "rom.h"
-#include "peanut.h"
-#include "util.h"
-#include "main.h"
+#include "headers/rom.h"
+#include "headers/peanut.h"
+#include "headers/util.h"
+#include "headers/main.h"
 
 
 /*Returns a byte from the ROM file at the given address

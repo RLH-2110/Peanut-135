@@ -6,7 +6,7 @@
 #include <signal.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "lvgl/lvgl.h"
+#include "../lvgl/lvgl.h"
 
 typedef enum display_mode {
   display_mode_default,
@@ -40,7 +40,6 @@ void draw_drm_line(uint16_t pixels[LCD_WIDTH]);
 void display_frame();
 
 /* LVGL flush callback */
-#include "lvgl/lvgl.h"
 void flush_cb(lv_display_t * display, const lv_area_t * area, uint8_t * px_map);
 
 void clear_screen();

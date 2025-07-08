@@ -14,20 +14,20 @@
 /* peanut */
 #define PEANUT_GB_IS_LITTLE_ENDIAN 1
 
-#include "peanut_gb.h"
+#include "headers/peanut_gb.h"
 
 /* inilib */
 #include "iniparser/src/iniparser.h"
 
 /* own includes */
-#include "rom.h"
-#include "ram.h"
-#include "lcd.h"
-#include "drm.h"
-#include "input.h"
-#include "main.h"
-#include "util.h"
-#include "blockmnt.h"
+#include "headers/rom.h"
+#include "headers/ram.h"
+#include "headers/lcd.h"
+#include "headers/drm.h"
+#include "headers/input.h"
+#include "headers/main.h"
+#include "headers/util.h"
+#include "headers/blockmnt.h"
 
 #include "westonkill.c"
 

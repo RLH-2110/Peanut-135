@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "main.h"
+#include "headers/main.h"
 
 /* pkill gives exit code 1, if the process is already dead. */
 #define WESTON_ALEADY_DEAD_CODE 1 

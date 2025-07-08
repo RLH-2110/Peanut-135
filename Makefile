@@ -35,26 +35,21 @@ $(TARGET): $(OBJDIR)tests.o $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJD
 	$(info    $(LIBDRM))
 	$(info    #############################################################################)
 	
-$(OBJDIR)drm.o: drm.c peanut.h drm_draw.c main.h
+$(OBJDIR)drm.o: drm.c headers/peanut.h drm_draw.c headers/main.h
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) $(LIBDRM) 
 
-$(OBJDIR)main.o: main.c westonkill.c peanut_gb.h main.h lvgl.c
+$(OBJDIR)main.o: main.c westonkill.c headers/peanut_gb.h headers/main.h lvgl.c
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
 
-$(OBJDIR)input.o: input.c touch_regions.c finger.c peanut.h main.h
-	mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) 
-
-$(OBJDIR)tests.o: forktest/tests.c peanut.h forktest/test_* main.h 
+$(OBJDIR)input.o: input.c touch_regions.c finger.c headers/peanut.h headers/main.h
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) 
 
 
 
-
-$(OBJDIR)%.o: %.c peanut.h forktest/test_* main.h lv_conf.h
+$(OBJDIR)%.o: %.c headers/peanut.h forktest/test_* headers/main.h lv_conf.h
 	#mkdir -p $(OBJDIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS)

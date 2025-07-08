@@ -14,10 +14,10 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
-#include "peanut.h"
-#include "drm.h"
-#include "lcd.h"
-#include "main.h"
+#include "headers/peanut.h"
+#include "headers/drm.h"
+#include "headers/lcd.h"
+#include "headers/main.h"
 
 volatile sig_atomic_t stop = 0; /* programms runs as long as this is unset */
 

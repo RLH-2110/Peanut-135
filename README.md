@@ -14,7 +14,7 @@ By default, BTN_1 is mapped to `A`, and BTN_2 is mapped to `B`.
 On the OpenSTLinux that I use for the STM32MPU135F-DK only one of the user buttons works by default, it is the lower button next to the LCD.  
 Since there are only 2 user buttons, where only one is usable by default, the other controls are handled via the touchscreen.  
 
-![Image: Touchscreen controls](touchscreen%20button%20map.png)
+![Image: Touchscreen controls](img/touchscreen%20button%20map.png)
 
 Here again in table form:
 
@@ -28,7 +28,7 @@ Here again in table form:
 | Bottom Centre      | Down          |
 | Bottom Right       | Start         |
 
-The controls can be remapped at compile time in: [button_map.h](button_map.h)
+The controls can be remapped at compile time in: [button_map.h](headers/button_map.h)
 
 # Configuration File
 

@@ -9,11 +9,11 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "ram.h"
+#include "headers/ram.h"
 #include "forktest/test_ram.h"
-#include "peanut.h"
-#include "util.h"
-#include "main.h"
+#include "headers/peanut.h"
+#include "headers/util.h"
+#include "headers/main.h"
 
 #define SAVE_FILE_MAX_LENGTH 100 
 #define SAVE_FILE_EXTENSION ".sav"

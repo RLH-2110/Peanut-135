@@ -1,8 +1,8 @@
 /* not a standalone file! included directly into input.c !*/
 
 #include <stdint.h>
-#include "peanut.h"
-#include "button_map.h"
+#include "headers/peanut.h"
+#include "headers/button_map.h"
 
 typedef enum touchr {
   touchr_center,
