@@ -1,7 +1,7 @@
 # Peanut-135
 
 Peanut-135 is a Game Boy Emulator for the STM32MPU135F-DK, based on [Peanut-GB](https://github.com/deltabeard/Peanut-GB) by [deltabeard](https://github.com/deltabeard)  
-It is assumed that this Program runs on **OpenSTLinux**.
+It is assumed that this Program runs on [**OpenSTLinux**](https://wiki.st.com/stm32mpu/wiki/STM32MPU_Distribution_Package#Installing_the_OpenSTLinux_distribution).
 
 # Installation
 
