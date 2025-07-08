@@ -5,7 +5,7 @@ It is assumed that this Program runs on **OpenSTLinux**.
 
 # Installation
 
-This is meant to work with Yocto, The next push will include a .bb file that you can move a directory up from the GitHub project.
+This is meant to work with Yocto, This project includes a .bb file that you can move a directory up from the GitHub project.
 Then just add the package to your image. Read the Yocto or Bitbake documentation if you need help.
 
 If you make an own Recipe, then don't forget to pass `all` to the Makefile, I remember having issues when not doing so.
