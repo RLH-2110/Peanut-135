@@ -4,7 +4,10 @@ Peanut-135 is a Game Boy Emulator for the STM32MPU135F-DK, based on [Peanut-GB](
 
 # Installation
 
-TODO
+This is meant to work with Yocto, The next push will include a .bb file that you can move a directory up from the GitHub project.
+Then just add the package to your image. Read the Yocto or Bitbake documentation if you need help.
+
+If you make an own Recipe, then don't forget to pass `all` to the Makefile, I remember having issues when not doing so.
 
 # Controls
 
@@ -51,10 +54,6 @@ Dependencies (stored in .gitmodules):
   
 3rd Party code (directly integrated):
 [DRM Doc](https://github.com/ascent12/drm_doc)
-
-# TODO
-
-The rest of this README is still TODO
 
 # Footnotes
 
