@@ -11,6 +11,14 @@
 
 /* stops weston, returns false on error, true on success */
 bool kill_weston(void){
+
+#if FULL_CONTROLL >= 1
+  puts("waiting 10 secs...");
+  sleep(10); /* 10 seconds (Waiting for weston to get ready, so we can cleanly kill it) */
+  puts("wait done. systemctl weston away");
+  system("systemctl stop weston-graphical-session.service");
+#endif
+
   puts("killing weston...");
   int code = system("pkill weston");
 
@@ -19,11 +27,9 @@ bool kill_weston(void){
     return false;
   }
   LOGR("KILL: WESTON",1);
-
-
-  
+    
   int i;
-  for (i = 0; i < 50; ++i) { /* Wait up to ~5 seconds */
+  for (i = 0; i < 300; ++i) { /* Wait up to ~30 seconds */
     if (system("pidof weston > /dev/null") != 0) {
       break; /* weston is gone */
     }

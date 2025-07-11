@@ -3,6 +3,9 @@
 
 #include <stddef.h>
 
+/* own thing to detect that we should exit on button press */
+#define PEANUT_EXIT_CODE 0x3217 /* any value bigger than 0xff works. we use 3217 because it spells out Ezit */
+
 /* this file is for exposing peanut_gb.h stuff, without including that file twice. */
 
 struct gb_s;

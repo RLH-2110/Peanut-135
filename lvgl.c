@@ -36,6 +36,9 @@ lv_obj_t *exitBtn = NULL;
 
 char *fileBuffer = NULL;  
 
+size_t listButtonSizeEstimate = 0; /* bill be dynamically estimated by the program */
+#define ESTIMATE_EXTRA_MARGIN 5 /* how many bytes to overestimate*/
+
 pthread_t tickThread;
 void *tick_thread(void* data);
 
@@ -56,6 +59,19 @@ void lvgl_path_dotdot_cb(lv_event_t *e);
 /* ------------------------------ */
 
 bool lvgl_main(void){
+
+  /* I expect them to be NULL, so better make sure they are */
+  pathLabel = NULL;
+  fileList = NULL; 
+  showAllFilesCheckbox = NULL;
+  fileNameBox = NULL;
+  sidePanelHomeLbl = NULL;
+  sidePanelRootLbl = NULL; 
+  okBtn = NULL;
+  exitBtn = NULL;
+
+
+
   lv_init();  
   LOGR("Alloc: LVGL",1);
 
@@ -88,7 +104,6 @@ bool lvgl_main(void){
 
 
   char* home = getenv("HOME");
-
 
   /* STYLES */
 
@@ -123,7 +138,7 @@ bool lvgl_main(void){
     lv_obj_set_style_pad_all(sidePanel, 5, 0);
     lv_obj_set_flex_flow(sidePanel, LV_FLEX_FLOW_COLUMN);
       
-    lv_label_set_text(sidePanelRootLbl,"/");
+    lv_label_set_text_static(sidePanelRootLbl,"/");
     if (sidePanelHomeLbl != NULL)
       lv_label_set_text(sidePanelHomeLbl,"home");
 
@@ -181,9 +196,9 @@ bool lvgl_main(void){
     lv_obj_set_width(pathBox, LV_PCT(100));
     lv_obj_set_flex_flow(pathBox, LV_FLEX_FLOW_ROW);
     lv_obj_t *pathExplainLbl = lv_label_create(pathBox);
-    lv_label_set_text(pathExplainLbl,"Path: ");
+    lv_label_set_text_static(pathExplainLbl,"Path: ");
     pathLabel = lv_label_create(pathBox); 
-    lv_label_set_text(pathLabel, "/");
+    lv_label_set_text_static(pathLabel, "/");
     lv_obj_set_height(pathBox, LV_SIZE_CONTENT);
 
 
@@ -193,7 +208,26 @@ bool lvgl_main(void){
     lv_obj_set_width(fileList, LV_PCT(100));
     lv_obj_set_scroll_dir(fileList, LV_DIR_VER);
 
+    /*get size estimate */
+    {
 
+      lv_mem_monitor_t mon;
+
+      lv_mem_monitor(&mon);
+      size_t before = mon.free_size;
+
+      lv_obj_t *button = lv_list_add_button(fileList, LV_SYMBOL_DIRECTORY, ""); 
+      lv_obj_add_event_cb(button, lvgl_path_dotdot_cb,LV_EVENT_CLICKED,NULL);
+
+      lv_mem_monitor(&mon);
+      size_t after = mon.free_size;
+
+      listButtonSizeEstimate = before - after + ESTIMATE_EXTRA_MARGIN;
+      printf("------------------------\nList button size estimate: %d\n",listButtonSizeEstimate);
+    
+      /* KILL ALL THE CHILDREN, so we have an empty list again */
+      lv_obj_clean(fileList);
+    }
 
     lv_obj_t *bottomRow = lv_obj_create(mainPanel);
     lv_obj_set_width(bottomRow, LV_PCT(100));
@@ -207,7 +241,7 @@ bool lvgl_main(void){
       lv_obj_set_flex_align(fileRow,LV_FLEX_ALIGN_START,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_START);
 
         lv_obj_t *fileLabel = lv_label_create(fileRow);
-        lv_label_set_text(fileLabel, "file:");
+        lv_label_set_text_static(fileLabel, "file:");
 
         lv_obj_t *fileNameFakeBox = lv_obj_create(fileRow);
         lv_obj_set_width(fileNameFakeBox, LV_PCT(100));
@@ -228,14 +262,14 @@ bool lvgl_main(void){
 
         okBtn = lv_btn_create(buttonRow);
         lv_obj_t *okLabel = lv_label_create(okBtn);
-        lv_label_set_text(okLabel, "OK");
+        lv_label_set_text_static(okLabel, "OK");
         lv_obj_add_event_cb(okBtn, lvgl_ok_exit_clicked_cb,LV_EVENT_CLICKED,NULL);
 
         exitBtn = lv_btn_create(buttonRow);
         lv_obj_t *exitLabel = lv_label_create(exitBtn);
-        lv_label_set_text(exitLabel, "Exit");
+        lv_label_set_text_static(exitLabel, "Exit");
         lv_obj_add_event_cb(exitBtn, lvgl_ok_exit_clicked_cb,LV_EVENT_CLICKED,NULL);
-        
+
         showAllFilesCheckbox = lv_checkbox_create(buttonRow);
         lv_checkbox_set_text(showAllFilesCheckbox, "Show all files");
         lv_obj_add_event_cb(showAllFilesCheckbox, lvgl_checkbox_toggle_cb, LV_EVENT_VALUE_CHANGED, NULL);
@@ -256,6 +290,24 @@ bool lvgl_main(void){
 
   lv_screen_load_anim(screen,LV_SCR_LOAD_ANIM_NONE,0,0,true);
 
+  /* for displaying error messages outside of lvgl */
+  if (showLvglErrorMsg != NULL){
+    static char tmpBuff[0xff] = {0};
+    if (strlen(showLvglErrorMsg) + 1 > sizeof(tmpBuff)){
+      printf("Error: %s is too long! (showLvglErrorMsg)\n",showLvglErrorMsg);
+    }else{
+
+      strcpy(tmpBuff,showLvglErrorMsg);
+
+      lv_obj_t *msg = lv_msgbox_create(NULL);
+      lv_msgbox_add_title(msg,"Info");
+      lv_msgbox_add_text(msg,tmpBuff);
+      lv_msgbox_add_close_button(msg);
+      showLvglErrorMsg = NULL;
+    }
+  }
+
+
   /* GUI END */
 
   // set innital path 
@@ -274,29 +326,37 @@ bool lvgl_main(void){
   }
  
   puts("Info closing LVGL...");
- 
+
   pthread_join(tickThread,NULL);
   LOGR("Clean: TICKTHREAD",-1);
-  lv_indev_delete(lvMouse);
+  lv_indev_delete(lvMouse); lvMouse = NULL;
   LOGR("Clean: LVMOUSE",-1);
-  lv_disp_remove(disp);
+  lv_disp_remove(disp); disp = NULL;
   LOGR("Clean: LVDISPLAY",-1);
   lv_deinit();
   LOGR("Clean: LVGL",-1);
 
 
   if (fileBuffer != NULL){
-    free(fileBuffer);
+    free(fileBuffer); fileBuffer = NULL;
     LOGR("Clean: FILEBUFFER",-1);
   }
 
   puts("Info: LVGL closed!");
+  lvDone = false; /* for when we start lvgl again */
 }
 
 
 /* --------------------------------- */
 
 bool goto_path(char* path){
+
+  printf("Info: trying to go to %s\n",path);
+  
+  if (path == NULL){
+    puts("Error: path can not be NULL in goto_path");
+    return false;
+  }
 
   if (pathLabel == NULL){
     puts("Error: pathLabel not set!");
@@ -325,7 +385,17 @@ bool goto_path(char* path){
   }
   
   bool showAllFiles = (lv_obj_get_state(showAllFilesCheckbox) & LV_STATE_CHECKED) != 0;
-  scan_path(path, fileBuffer, &fileBufferSize, &fileBufferIndex, !showAllFiles,false,false);
+  scan_path(path, &fileBuffer, &fileBufferSize, &fileBufferIndex, !showAllFiles,false,false);
+
+  if (fileBuffer == NULL){
+    puts("Error: Out of memory while reading directory");
+    lv_obj_t *msg = lv_msgbox_create(NULL);
+    lv_msgbox_add_close_button(msg);
+    lv_msgbox_add_title(msg,"Error");
+    lv_msgbox_add_text(msg,"Ran out of memory while reading directory!");
+    return false;
+  }
+
 
   /* KILL ALL THE CHILDREN !!! */
   lv_obj_clean(fileList);
@@ -335,7 +405,53 @@ bool goto_path(char* path){
     lv_obj_add_event_cb(button, lvgl_path_dotdot_cb,LV_EVENT_CLICKED,NULL);
   }
 
+  lv_mem_monitor_t mon;
   for (int i = 0; i < fileBufferIndex; i += strlen(fileBuffer + i) + 1){
+    
+
+    if ( /* if path with some virtual files */
+          strcmp(path,"/") == 0 && (
+            strncmp(fileBuffer + i,"proc",strlen("proc")) == 0 ||
+            strncmp(fileBuffer + i,"dev",strlen("dev")) == 0 ||
+            strncmp(fileBuffer + i,"sys",strlen("sys")) == 0
+          )
+       )
+    {
+      printf("skipping %s\n",fileBuffer + i);
+      continue;
+    }
+    
+
+    lv_mem_monitor(&mon);
+
+    if (mon.free_size < listButtonSizeEstimate + strlen(fileBuffer + i) ){ 
+      puts("Out Of Memory!");
+
+      /* free the memory */
+      lv_obj_clean(fileList);
+
+      lv_mem_monitor_t mon_after;
+      lv_mem_monitor(&mon_after);
+
+      printf("Total heap: %u bytes\n", mon.total_size);
+      printf(" Free heap: %u bytes (%u %% used)\n", mon.free_size, mon.used_pct);
+      printf(" Largest free block: %u bytes\n", mon.free_biggest_size);
+      printf(" Fragmentation: %u %%\n", mon.frag_pct);
+
+
+      char info[512 + 1];
+      snprintf(info,sizeof(info) - 1, "Too many files in %s! Out of Memory!\nLVGL Free heap: %u bytes (%u %% used)\nAborting and freeing Memory...\nLVGL Free heap: %u bytes (%u %% used)\nGoing back to /" \
+      ,path,mon.free_size, mon.used_pct,mon_after.free_size, mon_after.used_pct); 
+
+
+      lv_obj_t *msg = lv_msgbox_create(NULL);
+      lv_msgbox_add_close_button(msg);
+      lv_msgbox_add_title(msg,"Error");
+      lv_msgbox_add_text(msg, info);
+
+      /* try to go back to a save path*/
+      return goto_path("/");
+    }
 
     if (is_dir_path(path,fileBuffer + i)){
       lv_obj_t *button = lv_list_add_button(fileList, LV_SYMBOL_DIRECTORY, fileBuffer + i); 
@@ -344,11 +460,14 @@ bool goto_path(char* path){
       lv_obj_t *button = lv_list_add_button(fileList, LV_SYMBOL_FILE, fileBuffer + i); 
       lv_obj_add_event_cb(button, lvgl_printme_cb,LV_EVENT_CLICKED,NULL); /* file */
     }
-
-
+    
+    
   }
 
-  lv_label_set_text(pathLabel,path);
+  static char pathLabelStr[LV_FS_MAX_PATH_LENGTH+1] = {0};
+  strncpy(pathLabelStr,path,LV_FS_MAX_PATH_LENGTH); /* copy path, because it needs to be alive for the entirety of pathLabel's lifetime */
+  
+  lv_label_set_text(pathLabel,pathLabelStr);
 puts("done");
   return true;
 }
@@ -363,13 +482,17 @@ void lvgl_sidepanel_clicked_cb(lv_event_t *e){
   lv_obj_t *label = lv_obj_get_child(lv_event_get_target_obj(e),0);
 
   char* path = NULL;
+  bool freePath = false;
 
   if (label == sidePanelHomeLbl)
     path = getenv("HOME");
   else if (label == sidePanelRootLbl)
     path = "/";
   else if (strlen(lv_label_get_text(label)) == 4) { /* for sda1 and stuff*/
-    char devicePath[] = "/dev/\0da1";
+    freePath = true;
+    char devicePath[] = "/dev/\0da1\0";
+    devicePath[sizeof("/dev/")-1] = '\0'; /* we run this code multiple times, so we have to restore the NULL, or at least I think so. I have no time to check compleatly. */
+
     char *devicePathSdStart = devicePath + strlen(devicePath);
 
     strcpy(devicePathSdStart,lv_label_get_text(label)); 
@@ -384,6 +507,11 @@ void lvgl_sidepanel_clicked_cb(lv_event_t *e){
     return;
   
   goto_path(path);
+
+  if (freePath){
+    free(path); path = NULL;
+    LOGR("CLEAN: FIND_MOUNT_POINT_RESULT",1);
+  }
 }
 
 /* --------------------------------- */
@@ -398,7 +526,7 @@ void lvgl_printme_cb(lv_event_t *e){
   static char staticBuff[LV_FS_MAX_PATH_LENGTH];
 
   if (strlen(lv_label_get_text(label)) >= LV_FS_MAX_PATH_LENGTH){
-    printf("Error: %s is too long in lvgl_printme_cb!\n");
+    printf("Error: %s is too long in lvgl_printme_cb!\n",lv_label_get_text(label));
     return;
   }
   strcpy(staticBuff, lv_label_get_text(label));
@@ -478,7 +606,7 @@ void lvgl_checkbox_toggle_cb(lv_event_t *e){
 void lvgl_ok_exit_clicked_cb(lv_event_t *e){
 
   /* if any of them are NULL, return */
-  if (!okBtn || !exitBtn || !fileNameBox || !pathLabel)
+  if (!okBtn || !fileNameBox || !pathLabel)
     return;
 
   lv_obj_t *button = lv_event_get_target_obj(e);
@@ -497,7 +625,11 @@ void lvgl_ok_exit_clicked_cb(lv_event_t *e){
 
   }else if (button == exitBtn){
 
+#if FULL_CONTROLL == 0
     romFile = NULL; 
+#else
+    romFile = (char*)ADDR_SHUTDOWN; /* request shutdown */
+#endif
 
   }else{
     puts("Error: Invalid exit button!");

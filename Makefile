@@ -16,9 +16,11 @@ LVGL_SRCFILES := $(ASRCS) $(CSRCS)
 LVGL_OBJFILES := $(patsubst $(CURR_DIR)/%.c,obj/%.o,$(filter %.c,$(CSRCS))) \
                  $(patsubst $(CURR_DIR)/%.S,obj/%.o,$(filter %.S,$(ASRCS)))
 
+# CFLAGS += -g -O0
+
 all: $(TARGET)
 
-$(TARGET): $(OBJDIR)tests.o $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJDIR)util.o $(OBJDIR)lcd.o  $(OBJDIR)drm.o $(OBJDIR)input.o $(OBJDIR)blockmnt.o $(INICODE) $(LVGL_OBJFILES)
+$(TARGET): $(OBJDIR)main.o $(OBJDIR)rom.o $(OBJDIR)ram.o $(OBJDIR)util.o $(OBJDIR)lcd.o  $(OBJDIR)drm.o $(OBJDIR)input.o $(OBJDIR)blockmnt.o $(INICODE) $(LVGL_OBJFILES)
 
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LIBDRM)
 	$(info    #############################################################################)
@@ -39,7 +41,7 @@ $(OBJDIR)drm.o: drm.c headers/peanut.h drm_draw.c headers/main.h
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS) $(LIBDRM) 
 
-$(OBJDIR)main.o: main.c westonkill.c headers/peanut_gb.h headers/main.h lvgl.c
+$(OBJDIR)main.o: main.c westonkill.c headers/peanut_gb.h headers/main.h lvgl.c device_tree.c
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
 
@@ -49,7 +51,7 @@ $(OBJDIR)input.o: input.c touch_regions.c finger.c headers/peanut.h headers/main
 
 
 
-$(OBJDIR)%.o: %.c headers/peanut.h forktest/test_* headers/main.h lv_conf.h
+$(OBJDIR)%.o: %.c headers/peanut.h headers/main.h lv_conf.h
 	#mkdir -p $(OBJDIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS)

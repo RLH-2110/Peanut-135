@@ -60,6 +60,11 @@ bool load_rom_file(const char * const path){
 
   romData = NULL; /* default value, in case of early return */
 
+  if (is_file(path,-1) == false){
+    printf("%s is not a regular file!\n",path);
+    return false;
+  }
+
   /* check filesize */
   struct stat statStruct;
   if ( stat(path, &statStruct) != 0){

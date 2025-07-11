@@ -34,6 +34,10 @@ do_compile() {
 }
 
 FILES:${PN} += "/home/root/calc.gb"
+FILES:${PN} += "/etc/systemd/system/peanut135.service"
+FILES:${PN} += "/etc/systemd/system/multi-user.target.wants/peanut135.service"
+
+SYSTEMD_SERVICE:{PN} += "peanut135.service"
 
 do_install() {
 	# Specify install commands here
@@ -41,9 +45,16 @@ do_install() {
 	install -m 0755 peanut135 ${D}${bindir}
 
 	install -d ${D}/home/root
-	install -m 0644 calc.gb ${D}/home/root
+	install -m 0644 other/calc.gb ${D}/home/root
+
+  install -d ${D}/etc/systemd/system/
+  install -m 0644 other/peanut135.service ${D}/etc/systemd/system/
+
+  install -d ${D}/etc/systemd/system/multi-user.target.wants/
+  cp -a other/peanut135.service.symlink ${D}/etc/systemd/system/multi-user.target.wants/peanut135.service
 
 	install -d ${D}${sysconfdir}/peanut135
 	install -m 0644 default.ini ${D}${sysconfdir}/peanut135/config.ini
+	install -m 0644 other/stm32mp135f-dk.dtb ${D}${sysconfdir}/peanut135/stm32mp135f-dk.dtb
+
 }
- 

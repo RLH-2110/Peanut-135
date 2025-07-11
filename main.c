@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <stdint.h>
 #include <unistd.h>
@@ -10,7 +11,6 @@
 #include <linux/input.h>
 #include <sys/stat.h>
 #include <ctype.h>
-
 /* peanut */
 #define PEANUT_GB_IS_LITTLE_ENDIAN 1
 
@@ -31,6 +31,10 @@
 
 #include "westonkill.c"
 
+#if FULL_CONTROLL >= 1
+#include "device_tree.c"
+#endif
+
 /* GLOAL VARIBLES, EVEN OUTSID THIS FILE! */
     /* from rom.h */
 uint8_t *romData = NULL;
@@ -42,6 +46,8 @@ size_t cartRamSize;
 
    /* from main.h */
 int resource_count = 0;
+volatile sig_atomic_t romSelect = 0;
+char* showLvglErrorMsg = NULL; /* if not null, lvgl will show this string after setup and reset it to NULL */
 
    /* from drm.h*/
 display_mode_t displayMode;
@@ -65,8 +71,12 @@ bool searchHome;
 bool searchExternal;
 bool autoLoad;
 
+bool reinitGameboy = false;
+
+volatile sig_atomic_t signalStop = 0;
 
 void cleanup_and_exit(int exitCode);
+void soft_cleanup(void); /* for cleanup up the emulator, so we can restart it*/
 void gb_error(struct gb_s *gameboy, const enum gb_error_e gbError, const uint16_t addr);
 
 /* loads the config file using load_conf_vals (defined later)
@@ -78,10 +88,28 @@ void load_conf(bool useSystem);
 
 /* signal handler */
 void on_termination(int signal){
+  
+  static int i = 1;
+  
+  
+  if (i >= 3){ /* user wants to kill us, then lets die */
+    LOGR("RESOURCE LOG: GOT TERMINATION SIGNAL THREE TIMES! HONOURING THE REQUEST FOR DEATH...",0);
+    exit(EXIT_FAILURE); /* failure, because we could not clean up */
+  }
+    
+
   LOGR("RESOURCE LOG: GOT TERMINATION SIGNAL!",0);
+  signalStop = 1;
   stop = 1;
+  i++;
 }
 
+/* macro, so we call the right function in each mode we are in */
+#if FULL_CONTROLL == 0
+#define MAIN_CLEANUP(status) cleanup_and_exit(status)
+#else
+#define MAIN_CLEANUP(status) { soft_cleanup(); goto main_restart_point; }
+#endif
 
 #include "lvgl.c"
 
@@ -96,16 +124,25 @@ int run_main(int argc, char **argv){
   signal(SIGINT,on_termination);
   signal(SIGTERM,on_termination);
   
+#if FULL_CONTROLL >= 1
+  force_device_tree();
+  if (stop == 1)
+    return 0;
+#endif
+
+  /* the first few cant use MAIN_CLEANUP, since the first setup stage must be successfull for it to work */
+
   load_conf(false);
-  if( search_roms(customSearchPath,searchExternal,searchHome) == false)
+  if( search_roms(customSearchPath,searchExternal,searchHome) == false || roms == NULL)
     cleanup_and_exit(EXIT_FAILURE);
 
   if (kill_weston() == false)
-    cleanup_and_exit(EXIT_FAILURE);
+    cleanup_and_exit(EXIT_FAILURE); 
 
   if (setup_drm() == false)
     cleanup_and_exit(EXIT_FAILURE);
 
+  puts("first setup stage was sucessfull!");
 
   /* get rom from either arguments, autoLoad or lvgl */
   if (argc >= 2) {
@@ -116,23 +153,38 @@ int run_main(int argc, char **argv){
     }else{
       if (get_roms_count() == 1)
         romFile = get_first_from_roms();
-      else
+      else{
+main_restart_point:
+#if FULL_CONTROLL
+        puts("\n\n main_restart_point reached");
+#endif
         lvgl_main();
+      }
     }
   }
+
+#if FULL_CONTROLL >= 1
+  if ((void*)romFile == (void*)ADDR_SHUTDOWN){ /* some ugly hack so we can shut down when FULL_CONTROL is on */
+    puts("shutdown requested");
+    system("shutdown now");
+    cleanup_and_exit(EXIT_SUCCESS);
+  }
+#endif
 
   printf("Selected rom file: %s\n",romFile);
 
   clear_screen();
 
   if (romFile == NULL || *romFile == '\0')
-    cleanup_and_exit(EXIT_SUCCESS); /* this can only happen if the user exited lvgl without selecting a ROM, so the user did not select a ROM on purpose, and we can exit */
+    MAIN_CLEANUP(EXIT_SUCCESS); /* this can only happen if the user exited lvgl without selecting a ROM, so the user did not select a ROM on purpose, and we can exit */
 
-  if (load_rom_file(romFile) == false)
-    cleanup_and_exit(EXIT_FAILURE);
+  if (load_rom_file(romFile) == false){
+    showLvglErrorMsg = "Could not load ROM!";
+    MAIN_CLEANUP(EXIT_FAILURE);
+  }
 
   if (init_input() == false)
-    cleanup_and_exit(EXIT_FAILURE);
+    cleanup_and_exit(EXIT_FAILURE); /* hard exit, because we need input */
 
   struct tm* localTime = NULL; 
   time_t currentTime = time(NULL);
@@ -141,8 +193,9 @@ int run_main(int argc, char **argv){
     puts("could not get time! using the epoch time");
 
 
-  
-  int gbInitErr = gb_init(&gameboy, gb_rom_read, gb_cart_ram_read, gb_cart_ram_write, gb_error, NULL);
+  memset(&gameboy, 0, sizeof(gameboy)); /* clean up the stuct. is usefull for when we restart the gameboy with a new ROM */
+  int gbInitErr;
+  gbInitErr = gb_init(&gameboy, gb_rom_read, gb_cart_ram_read, gb_cart_ram_write, gb_error, NULL);
 
   if (gbInitErr != 0){
     fputs("Init Error: ",stdout);
@@ -150,13 +203,16 @@ int run_main(int argc, char **argv){
     switch(gbInitErr){
       case GB_INIT_CARTRIDGE_UNSUPPORTED:
         puts("Cartdrige unsupported!"); 
-        cleanup_and_exit(EXIT_FAILURE);
+        showLvglErrorMsg = "Cartridge unsupported!";
+        MAIN_CLEANUP(EXIT_FAILURE);
       case GB_INIT_INVALID_CHECKSUM:
         puts("Cartdrige checksum fail!");
-        cleanup_and_exit(EXIT_FAILURE);
+        showLvglErrorMsg = "Cartridge checksum fail!";
+        MAIN_CLEANUP(EXIT_FAILURE);
       default:
         puts("Unkown error!");
-        cleanup_and_exit(EXIT_FAILURE);
+        showLvglErrorMsg = "Unkown initialisation error";
+        MAIN_CLEANUP(EXIT_FAILURE);
     }    
   }
 
@@ -174,7 +230,7 @@ int run_main(int argc, char **argv){
 
   gameboy.direct.joypad = 0xFF;
 
-  while(!stop){
+  while(!stop && !romSelect){
     gb_run_frame(&gameboy);
     display_frame(); 
 
@@ -190,6 +246,13 @@ int run_main(int argc, char **argv){
     }
   }
 
+#if FULL_CONTROLL
+  if (signalStop == 0){
+    soft_cleanup();
+    goto main_restart_point; /* got to file menu and wait for new roms */
+  }
+
+#endif
   cleanup_and_exit(EXIT_SUCCESS);
 }
 
@@ -197,6 +260,7 @@ int run_main(int argc, char **argv){
 
 void cleanup_and_exit(int exitCode){
 
+  puts("exit requested");
   stop = 1;
 
   cleanup_drm();
@@ -227,6 +291,39 @@ void cleanup_and_exit(int exitCode){
   exit(exitCode);
 }
 
+/* for cleanup up the emulator, so we can restart it*/
+void soft_cleanup(void){
+
+  if (signalStop) /* if we actually want to exit */
+    cleanup_and_exit(EXIT_SUCCESS);
+
+  romSelect = 1;
+  reinitGameboy = true;
+  puts("soft clean requested");
+
+  if (roms != NULL){
+    free(roms); roms = NULL; romsSize = 0;
+    LOGR("Clean: ROMS",-1);
+  }
+
+  if (romData != NULL){
+    if (unmap_rom(romData,romSize) != 0) /* just an munmap, but I can easily switch that if I decide on a different approach */    
+      perror("Error: Failed to unmap rom! errno");
+    romData = NULL;
+    romSize = 0;
+    LOGR("CLEAN: ROMDATA",-1);
+  }
+
+  if (cartRamData != NULL){
+    free(cartRamData); cartRamData = NULL;
+    LOGR("CLEAN: RAMDATA",-1);
+  }
+
+
+  cleanup_input();
+
+  romSelect = 0; 
+}
 
 const char const *gbErrorStr[GB_INVALID_MAX] = {
   "Unknown error",
@@ -271,6 +368,7 @@ void load_conf_vals( dictionary *ini ){
     displayMode = display_mode_default;
     return;
   }
+  LOGR("ALLOC: DISPMODE",1);
   strcpy(dispMode,dispModeReadOnly);
 
   for(int i = 0; dispMode[i] != '\0'; i++)
@@ -292,6 +390,8 @@ void load_conf_vals( dictionary *ini ){
     displayMode = display_mode_default;
   }
  
+  free(dispMode); dispMode = NULL;
+  LOGR("CLEAN: DISPMODE",-1);
 }
 
 
@@ -329,10 +429,13 @@ void load_conf(bool useSystem){
     /* printf("Info: could not load ini file at %s\n",path); already printed by iniparser */
     goto load_conf_error;
   }
+  LOGR("ALLOC: INIPARSER",1);
 
   printf("Info: Loading config file %s...\n",path);
   load_conf_vals(ini);
 
+  iniparser_freedict(ini);
+  LOGR("CLEAN: INIPARSER",-1);
   return;
 
  /* only reachable via goto for cleanup */

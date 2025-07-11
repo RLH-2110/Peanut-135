@@ -55,8 +55,8 @@ unsigned int get_roms_count(void){
 /* -------------------------------------------------------------- */
 
 /* modifies heapBuffer, heapBuffSize and heapBuffIndex! */
-void scan_path(char* path, char* heapBuffer, size_t *heapBuffSize, size_t *heapBuffIndex, bool onlyGb, bool excludeDirs, bool prefixPath ){
-  if (path == NULL || heapBuffer == NULL || heapBuffSize == NULL || heapBuffIndex == NULL)
+void scan_path(char* path, char** heapBuffer, size_t *heapBuffSize, size_t *heapBuffIndex, bool onlyGb, bool excludeDirs, bool prefixPath ){
+  if (path == NULL || heapBuffer == NULL || *heapBuffer == NULL || heapBuffSize == NULL || heapBuffIndex == NULL)
     return;
 
 #if DEBUG_BLOCKMNT 
@@ -66,12 +66,6 @@ void scan_path(char* path, char* heapBuffer, size_t *heapBuffSize, size_t *heapB
   DIR *dir = opendir(path);
   if (dir == NULL){
     printf("could not open directory %s\n",path);
-    
-    char* debtest = path;
-    while (*debtest != '\0')
-      printf("%X ",*debtest);
-    printf("%X\n",0);
-
     return;
   }
   LOGR("Open: Directory",1);
@@ -107,8 +101,9 @@ void scan_path(char* path, char* heapBuffer, size_t *heapBuffSize, size_t *heapB
 
     /* check if buffer is big enough */
     if (*heapBuffSize - *heapBuffIndex < len + 1 ){
-      if (EXPAND(heapBuffer,*heapBuffSize) == false){
+      if (EXPAND(*heapBuffer,*heapBuffSize) == false){
         puts("Not enogh free Memory!");
+        *heapBuffer = NULL;
         *heapBuffSize = 0; 
         LOGR("Clean: ROMS",-1);
         return;
@@ -116,11 +111,11 @@ void scan_path(char* path, char* heapBuffer, size_t *heapBuffSize, size_t *heapB
     } 
 
     if (prefixPath)
-      path_construct(heapBuffer + *heapBuffIndex,*heapBuffSize - *heapBuffIndex, path, dirEntry->d_name); // save the full path
+      path_construct(*heapBuffer + *heapBuffIndex,*heapBuffSize - *heapBuffIndex, path, dirEntry->d_name); // save the full path
     else
-      strcpy(heapBuffer + *heapBuffIndex,dirEntry->d_name); // save filename only 
+      strcpy(*heapBuffer + *heapBuffIndex,dirEntry->d_name); // save filename only 
 
-    *heapBuffIndex += strlen(heapBuffer + *heapBuffIndex) + 1;
+    *heapBuffIndex += strlen(*heapBuffer + *heapBuffIndex) + 1;
   }
 
 
@@ -153,7 +148,7 @@ bool search_roms(char* customSearchPath, bool searchExternal, bool searchHome){
 
   /* scan custom path*/
   if (customSearchPath != NULL && customSearchPath[0] != '\0'){
-    scan_path(customSearchPath,roms,&romsSize, &romsIndex, true,true,true);
+    scan_path(customSearchPath,&roms,&romsSize, &romsIndex, true,true,true);
   }  
 
   /* scan mounted stuff */
@@ -162,7 +157,7 @@ bool search_roms(char* customSearchPath, bool searchExternal, bool searchHome){
     mount_list_t *current = mountedSCSI;
 
     while(current != NULL){
-      scan_path(current->mountPoint,roms,&romsSize, &romsIndex, true, true,true);
+      scan_path(current->mountPoint,&roms,&romsSize, &romsIndex, true, true,true);
       current = current->next;
     }
     free_mount_list(mountedSCSI);
@@ -174,7 +169,7 @@ bool search_roms(char* customSearchPath, bool searchExternal, bool searchHome){
     if (home == NULL)
       puts("Warning: Can't find home directory!");
     else
-      scan_path(home,roms,&romsSize, &romsIndex, true, true, true);
+      scan_path(home,&roms,&romsSize, &romsIndex, true, true, true);
   }
 
 #if DEBUG_BLOCKMNT
@@ -491,9 +486,11 @@ mount_list_t* get_mounted_partitions(void){
     printf("debug test:\n\tDevice: %s\n\tmountPoint: %s\n",current->device, current->mountPoint);
     printf("\tall: ");
     for (int i = 0; i < mallocSize;i++)
-      if (*(((char*)current)+i) == '\0')
+      if (*(((char*)current)+i) == '\0') /* NULL terminator */
         printf("\\0");
-      else
+      else if (*(((char*)current)+i) < ' ' || *(((char*)current)+i) > '~') /* non-printable */
+        printf("0x%X ", *(((char*)current)+i));
+      else /* printable */
         printf("%c", *(((char*)current)+i));
     puts("");
 #endif
@@ -544,7 +541,7 @@ void free_mount_list(mount_list_t *list){
 
 /* gets mount point from partition path. so for /dev/sda1 is might find /mnt/foo  */
 /* taks in paths like /dev/sda1 or /dev/sdb8 */
-/* returns: NULL if not found, or mounth path, if found*/
+/* returns: NULL if not found, or mounth path, if found. MUST BE FREED! */
 char* find_mount_point(char* partitionPath){
   mount_list_t *mountedSCSI = get_mounted_partitions();
   mount_list_t *current = mountedSCSI;
@@ -557,6 +554,15 @@ char* find_mount_point(char* partitionPath){
       break;
     }
     current = current->next;
+  }
+
+  if (found != NULL){
+    found = strdup(found); /* get a copy of the string */
+
+    if (found == NULL)
+      puts("Error: Out of memory in find_mount_point");
+    else
+      LOGR("ALLOC: FIND_MOUNT_POINT_RESULT",1);
   }
 
   free_mount_list(mountedSCSI);

@@ -4,7 +4,7 @@
 #include "peanut.h"
 
 #define BTN_1_KEY     JOYPAD_A
-#define BTN_2_KEY     JOYPAD_B
+#define BTN_2_KEY     PEANUT_EXIT_CODE
 
 #define TOUCH_UP            JOYPAD_UP
 #define TOUCH_RIGHT         JOYPAD_RIGHT

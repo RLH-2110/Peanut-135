@@ -221,6 +221,10 @@ bool setup_drm(void){
   int ret = drmModeSetCrtc(drm_fd, crtc, fb1_id, 0, 0, &drm_conn->connector_id, 1, &drm_conn->modes[0]);
   if (ret < 0) {
     perror("drmModeSetCrtc could net set the mode");
+
+    drmModeFreeResources(resources);
+    LOGR("CLEAN: DRMMODERES",-1);
+    cleanup_drm();
   }
 
 

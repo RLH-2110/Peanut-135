@@ -21,6 +21,26 @@ bool choice(const char * const formatStr, ...);
 */
 int get_file_size(int fd);
 
+
+/* checks if a path or file descriptor is a file
+  
+  clears errno, if there was no error.
+
+  path: if its a Non-NULL value, then is_dir checks if the path is a file
+  fd: ignroed when path is not NULL. if the path is NULL, then we check if the fd is a file.
+
+  returns: false if stat failed, or if its not a file
+           true if its a file
+
+  errno:
+    EINVAL: if path is NULL and fd is -1
+    
+    Errno can also be set by the stat function here, see errno documentation of stat
+
+*/
+bool is_file(char const * const path, int fd);
+
+
 /* checks if a path or file descripor is a directory
   
   path: if its a Non-NULL value, then is_dir checks if the path is a dir

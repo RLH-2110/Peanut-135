@@ -162,7 +162,7 @@ void *touch_thread(void* data){
   activeFingerArrId = -1;
   activeFingerId = -1;
 
-  while(!stop){
+  while(!stop && !romSelect){
 
     if (poll(&pollStruct,1,500) < 0){
       perror("Warning: Touch Thread Poll Error");
@@ -251,17 +251,26 @@ void *touch_thread(void* data){
 
           int mask = get_button_from_touch(finger->x, finger->y); /* register current finger button and update finger if released */
 
+          if (mask == PEANUT_EXIT_CODE)
+            romSelect = 1;
+          else{
 
-          if (finger->released == true){
-
-            released_stuff |= mask;
-            finger->slot_used = false;
-          }else{
-            pressed_stuff |= mask;
+            if (finger->released == true){
+              released_stuff |= mask;
+              finger->slot_used = false;
+            }else{
+              pressed_stuff |= mask;
+            }
           }
 
           if (finger->region != finger->region_previous){  /* unset buttons where the user moved their finger off them */
-            released_stuff |= translate_touch_region(finger->region_previous);
+            int mask2 = translate_touch_region(finger->region_previous); 
+
+            if (mask2 == PEANUT_EXIT_CODE)
+              romSelect = 1;
+            else
+              released_stuff |= mask2;
+
             finger->region_previous = finger->region;
           }
 
@@ -321,7 +330,7 @@ void *button_thread(void* data){
   struct pollfd pollStruct = {buttonsFd, POLLIN, 0}; 
   struct input_event ev;
 
-  while(!stop){
+  while(!stop && !romSelect){
 
     if (poll(&pollStruct,1,500) < 0){
       perror("Warning: Button Thread Poll Error");
@@ -340,30 +349,42 @@ void *button_thread(void* data){
         /* A */
         if (ev.code == BTN_1){
           if (ev.value == 1){  /* pressed */
-            pthread_mutex_lock(&inputLock); 
-            button_presses |= BTN_1_KEY; /* add to presses */
-            button_presses_released = button_presses_released & (~BTN_1_KEY); /* remove from released */
-            pthread_mutex_unlock(&inputLock);
+            if ( BTN_1_KEY == PEANUT_EXIT_CODE){
+              romSelect = 1;
+            }else{
+              pthread_mutex_lock(&inputLock); 
+              button_presses |= BTN_1_KEY; /* add to presses */
+              button_presses_released = button_presses_released & (~BTN_1_KEY); /* remove from released */
+              pthread_mutex_unlock(&inputLock);
+            }
           }
           else{ /* released */
-            pthread_mutex_lock(&inputLock); 
-            button_presses_released |= BTN_1_KEY; /* add to released */
-            pthread_mutex_unlock(&inputLock);
+            if (BTN_1_KEY != PEANUT_EXIT_CODE){
+              pthread_mutex_lock(&inputLock); 
+              button_presses_released |= BTN_1_KEY; /* add to released */
+              pthread_mutex_unlock(&inputLock);
+            }
           }  
         }
 
         /* B */
         if (ev.code == BTN_2){
           if (ev.value == 1){  /* pressed */
-            pthread_mutex_lock(&inputLock); 
-            button_presses |= BTN_2_KEY; /* add to presses */
-            button_presses_released = button_presses_released & (~BTN_2_KEY); /* remove from released */
-            pthread_mutex_unlock(&inputLock);
+            if ( BTN_2_KEY == PEANUT_EXIT_CODE){
+              romSelect = 1;
+            }else{
+              pthread_mutex_lock(&inputLock); 
+              button_presses |= BTN_2_KEY; /* add to presses */
+              button_presses_released = button_presses_released & (~BTN_2_KEY); /* remove from released */
+              pthread_mutex_unlock(&inputLock);
+            }
           }
           else{ /* released */
-            pthread_mutex_lock(&inputLock); 
-            button_presses_released |= BTN_2_KEY; /* add to released */
-            pthread_mutex_unlock(&inputLock);
+            if (BTN_2_KEY != PEANUT_EXIT_CODE){
+              pthread_mutex_lock(&inputLock); 
+              button_presses_released |= BTN_2_KEY; /* add to released */
+              pthread_mutex_unlock(&inputLock);
+            }
           }  
         }
 

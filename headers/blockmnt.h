@@ -5,8 +5,8 @@ extern char *roms;
 extern size_t romsIndex;
 extern size_t romsSize;
 
-/* limits */
-#define MAX_SCSI_DEVICES
+/* limits (note, you cant set the limit, these are just representing the limit) */
+#define MAX_SCSI_DEVICES 26
 #define MAX_PARTITIONS 9
 
 /* finds roms, and creates a list of them into `roms` and upadtes `romsCount`*/
@@ -31,7 +31,7 @@ unsigned int get_roms_count(void);
 
 /* gets mount point from partition path. so for /dev/sda1 is might find /mnt/foo  
     takes in paths like /dev/sda1 or /dev/sdb8 
-    returns: NULL if not found, or mounth path, if found
+    returns: NULL if not found, or mounth path, if found. MUST BE FREED!
 */
 char* find_mount_point(char* partitionPath);
 
@@ -40,13 +40,13 @@ char* find_mount_point(char* partitionPath);
     if onlyGb is set, filters out files that are not .gb!
 
    path: path to search
-   heapBuffer: a buffer allocated on the heap. The found files will be put here. (will be read and written to)
+   heapBuffer: a pointer buffer allocated on the heap. The found files will be put here. (will be read and written to, pointer may be set to NULL on error)
    heapBuffSize: the currentSize of the heap buffer (will be read and written to)
    heapBuffIndex: The current index of the heap buffer (where to start writing) (will be read and written to)
    onlyGb: shows only .gb files if set, otherwhise it will show all files 
    excludeDirs: if set, excludes directories from the search
  */
-void scan_path(char* path, char* heapBuffer, size_t *heapBuffSize, size_t *heapBuffIndex, bool onlyGb, bool excludeDirs, bool prefixPath);
+void scan_path(char* path, char** heapBuffer, size_t *heapBuffSize, size_t *heapBuffIndex, bool onlyGb, bool excludeDirs, bool prefixPath);
 
 /* INCLUDED_BLOCKMNT_H */
 #endif

@@ -10,7 +10,6 @@
 #include <string.h>
 
 #include "headers/ram.h"
-#include "forktest/test_ram.h"
 #include "headers/peanut.h"
 #include "headers/util.h"
 #include "headers/main.h"
@@ -112,19 +111,16 @@ bool initalize_cart_ram(struct gb_s *gameboy, const char *const romName){
   /*initalize in case of early return*/
   cartRamData = NULL;
 
-  if (testCartridgeRamOverwriteOn == false){
-    if (gameboy == NULL){
-      puts("Error: gameboy can not be NULL in initalize_cart_ram");
-      return false;
-    }
+  if (gameboy == NULL){
+    puts("Error: gameboy can not be NULL in initalize_cart_ram");
+    return false;
+  }
 
-    if (gb_get_save_size_s(gameboy, &cartRamSize) != 0){
-      puts("Error: could not get cartridge ram size!");
-      cartRamSize = 0; 
-    }
+  if (gb_get_save_size_s(gameboy, &cartRamSize) != 0){
+    puts("Error: could not get cartridge ram size!");
+    cartRamSize = 0; 
+  }
 
-  }else
-    cartRamSize = testCartridgeRamOverwrite;
 
   if (cartRamSize == 0)
     return true; /* no cartrige ram needed */
@@ -133,9 +129,6 @@ bool initalize_cart_ram(struct gb_s *gameboy, const char *const romName){
     puts("Error: Please provie the romName in initalize_cart_ram, to get the save file name");
     return false;
   }
-
-  if (testNeverLoadFromFileOverwrite)
-    goto file_does_not_exit;
 
   if (SAVE_FILE_USABLE_LENGH <= 3){
     printf("please increase the size of SAVE_FILE_MAX_LENGTH in RAM.H!\n\t Curent useable size: %ld\n",SAVE_FILE_USABLE_LENGH);  

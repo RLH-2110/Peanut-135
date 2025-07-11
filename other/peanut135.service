@@ -1,0 +1,25 @@
+[Unit]
+Description=Peanut-135 Game Boy Emulator
+After=weston-graphical-session.service
+
+[Service]
+ExecStart=/usr/bin/peanut135
+Restart=no
+User=root
+
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/ttySTM0
+
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=HOME=/home/root
+
+PrivateDevices=no
+ProtectKernelModules=no
+ProtectControlGroups=no
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_SYS_RAWIO CAP_SYS_TTY_CONFIG
+DeviceAllow=* rw
+DevicePolicy=auto
+
+[Install]
+WantedBy=multi-user.target

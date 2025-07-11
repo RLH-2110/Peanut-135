@@ -2,21 +2,8 @@
 *.o
 *.a
 peanut135
-tags
 build*/
-bin*/
-# Profile items
-*.html
-*.css
-*.gch
-*.gcda
-*.gcno
-# Run items
-*.sav
-*.bmp
-*.gb
-*.gbc
-*.bin
+obj/*
 
 #links
 oe-*
