@@ -13,7 +13,7 @@ This Emulator only supports SDA-SDZ and only mounts the first 9 partitions.
 The file browser can only display at most 32 Partitions (arbitrary limit, can be adjusted)
 
 > [!Note]
-> See if I forgot some
+> TODO: See if I forgot some
 
 # Installation
 
