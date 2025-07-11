@@ -155,9 +155,6 @@ int run_main(int argc, char **argv){
         romFile = get_first_from_roms();
       else{
 main_restart_point:
-#if FULL_CONTROLL
-        puts("\n\n main_restart_point reached");
-#endif
         lvgl_main();
       }
     }
@@ -299,7 +296,6 @@ void soft_cleanup(void){
 
   romSelect = 1;
   reinitGameboy = true;
-  puts("soft clean requested");
 
   if (roms != NULL){
     free(roms); roms = NULL; romsSize = 0;

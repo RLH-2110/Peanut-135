@@ -8,8 +8,9 @@ It is assumed that this Program runs on [**OpenSTLinux**](https://wiki.st.com/st
 
 # Limitations
 
-This emulator can mount SCSI devices for you, but only when it starts, it does not hot plug them!  
+This emulator can mount SCSI devices for you, but only when it starts and when LVGL_MAIN is called, so when you insert an USB when the file Browser is active, you have to select a rom and enter the file browser again, or press `OK` without selecting a file.  
 This Emulator only supports SDA-SDZ and only mounts the first 9 partitions.
+The file browser can only display at most 32 Partitions (arbitrary limit, can be adjusted)
 
 > [!Note]
 > See if I forgot some

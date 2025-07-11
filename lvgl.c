@@ -13,6 +13,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 
 #include "headers/lcd.h"
 #include "headers/drm.h"
@@ -70,7 +71,7 @@ bool lvgl_main(void){
   okBtn = NULL;
   exitBtn = NULL;
 
-
+  find_and_mount(); /* mount new USB, each time we launch the LVGL menu */
 
   lv_init();  
   LOGR("Alloc: LVGL",1);
@@ -151,6 +152,7 @@ bool lvgl_main(void){
       sideButtonSize = lv_obj_get_width(sidePanelHomeBtn); /* every side button will be as big as the home button */
     }
 
+
     /* for dynamically addings buttons */
 
 #define MAX_LVGL_SCSI 32 /* I want to see the person that mounts more than 32 partitions when there are only 4 usb slots */
@@ -161,8 +163,15 @@ bool lvgl_main(void){
     mount_list_t* mountedScsi = get_mounted_partitions();
     mount_list_t* current = mountedScsi;
 
+    struct stat st;
+
     /* add all SCSI partitions */
     for (int i = 0; current != NULL && i < MAX_LVGL_SCSI; i++, current = current->next){
+
+      /* dont show, if it does not exist anymore (it can somehow still show mount points for ejected SCSI devices?!) */
+      if ( stat(current->device,&st) != 0)
+        continue;
+
       scsiButtons[i] = lv_btn_create(sidePanel);
       scsiLabels[i] = lv_label_create(scsiButtons[i]);
       
@@ -223,7 +232,6 @@ bool lvgl_main(void){
       size_t after = mon.free_size;
 
       listButtonSizeEstimate = before - after + ESTIMATE_EXTRA_MARGIN;
-      printf("------------------------\nList button size estimate: %d\n",listButtonSizeEstimate);
     
       /* KILL ALL THE CHILDREN, so we have an empty list again */
       lv_obj_clean(fileList);
