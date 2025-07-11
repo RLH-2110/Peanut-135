@@ -29,7 +29,9 @@ The Most important setting is `FULL_CONTROLL` in headers/main.h, if set to 1, th
 
 
 headers/main.h LOG_RESOURCES - if set to 1, it will log "Resource" usage. Where Resource is anything that had been done, that needs to be undone (like free/malloc open/close, ...)  
+
 blockmnt.c DEBUG_BLOCKMNT - if set to 1, it will print debug information for functions in this file
+
 input.c DEBUG_INPUTS - if set to 1 or higher, it will print debug information for functions in this and included files. There are multiple levels here, from 0 to 4  
 
 
@@ -50,7 +52,7 @@ If CTRL+C is pressed a total of 3 times or more, then the program will forcefull
 
 This emulator assumes you are using OpenSTLinux, and that BTN_1 is `User button 2`. (This can be remapped, and should BTN_2 be set in the Device tree, it will be used too)  
 
-By default, BTN_1 is mapped to `A`, and BTN_2 is mapped to `B`.  
+By default, BTN_1 is mapped to `A`, and BTN_2 is mapped to going back to the file selection menu.  
 On the OpenSTLinux that I use for the STM32MPU135F-DK only one of the user buttons works by default, it is the lower button next to the LCD.  
 Since there are only 2 user buttons, where only one is usable by default, the other controls are handled via the touchscreen.  
 
